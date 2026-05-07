@@ -69,6 +69,35 @@ state.clientId = (() => {
 })();
 state.playerName = localStorage.getItem('sts_player_name') || '';
 
+const nameEntryEl   = document.getElementById('name-entry');
+const entryNameInput = document.getElementById('entry-name');
+const startPlayingBtn = document.getElementById('start-playing');
+const entryErrorEl  = document.getElementById('entry-error');
+
+if (!state.playerName) {
+  nameEntryEl.classList.remove('hidden');
+  entryNameInput.value = '';
+  state.running = false; // pause the engine until they submit
+} else {
+  // Already named on a prior visit; just go.
+  nameEntryEl.classList.add('hidden');
+}
+
+startPlayingBtn.addEventListener('click', () => {
+  const v = entryNameInput.value.trim();
+  if (!/^[A-Za-z0-9 ]{1,16}$/.test(v)) {
+    entryErrorEl.textContent = 'Name must be 1–16 letters, numbers, or spaces.';
+    entryErrorEl.classList.remove('hidden');
+    return;
+  }
+  state.playerName = v;
+  localStorage.setItem('sts_player_name', v);
+  nameEntryEl.classList.add('hidden');
+  entryErrorEl.classList.add('hidden');
+  state.running = true;
+  typeInput.focus();
+});
+
 // ─── Word pool ───────────────────────────────────────
 let prefixIndex = new Map(); // prefix(string) → Set<enemyId>
 
@@ -511,12 +540,108 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 
+// ─── Game-over flow, score submission, leaderboard ──
+const gameOverEl     = document.getElementById('game-over');
+const goSummaryEl    = document.getElementById('game-over-summary');
+const goNameEl       = document.getElementById('game-over-name');
+const submitScoreBtn = document.getElementById('submit-score');
+const submitErrorEl  = document.getElementById('submit-error');
+const leaderboardEl  = document.getElementById('leaderboard');
+const playAgainBtn   = document.getElementById('play-again');
+const rankSummaryEl  = document.getElementById('rank-summary');
+const lbTodayEl      = document.getElementById('lb-today');
+const lbAlltimeEl    = document.getElementById('lb-alltime');
+
+let gameOverShown = false;
+function showGameOver() {
+  if (gameOverShown) return;
+  gameOverShown = true;
+  goSummaryEl.textContent =
+    `Score ${state.score} · ${state.kills} words · WPM ${currentWpm()} · ACC ${currentAccuracy()}% · time ${elapsedHHMMSS()}`;
+  goNameEl.textContent = state.playerName;
+  submitErrorEl.classList.add('hidden');
+  gameOverEl.classList.remove('hidden');
+}
+
+submitScoreBtn.addEventListener('click', async () => {
+  submitScoreBtn.disabled = true;
+  submitErrorEl.classList.add('hidden');
+  try {
+    const r = await fetch('/api/score.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: state.playerName,
+        score: state.score,
+        wave: state.spawn.wave,
+        duration: Math.floor(state.time),
+        wpm: currentWpm(),
+        accuracy: currentAccuracy(),
+        wordsSlain: state.kills,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      submitErrorEl.textContent = j.error || `HTTP ${r.status}`;
+      submitErrorEl.classList.remove('hidden');
+      submitScoreBtn.disabled = false;
+      return;
+    }
+    rankSummaryEl.textContent = `You ranked #${j.rank}.`;
+    await renderLeaderboard();
+    gameOverEl.classList.add('hidden');
+    leaderboardEl.classList.remove('hidden');
+  } catch (e) {
+    submitErrorEl.textContent = 'Could not reach server.';
+    submitErrorEl.classList.remove('hidden');
+    submitScoreBtn.disabled = false;
+  }
+});
+
+async function renderLeaderboard() {
+  try {
+    const r = await fetch('/api/leaderboard.php', { cache: 'no-store' });
+    const j = await r.json();
+    const fmt = e => `<li><b>${e.name}</b> — ${e.score} (W${e.wave}, WPM ${e.wpm}, ${e.accuracy}%)</li>`;
+    lbTodayEl.innerHTML   = (j.today   || []).map(fmt).join('');
+    lbAlltimeEl.innerHTML = (j.allTime || []).map(fmt).join('');
+  } catch (_) { /* ignore */ }
+}
+
+playAgainBtn.addEventListener('click', () => {
+  // Reset everything
+  state.enemies.length = 0;
+  prefixIndex.clear();
+  state.score = 0; state.kills = 0; state.streak = 0; state.bestStreak = 0;
+  state.keystrokes = { correct: 0, total: 0 };
+  state.wpmLog.length = 0;
+  state.hero.hp = MAX_HP;
+  state.time = 0;
+  state.spawn = { nextAt: 0, wave: 1, waveStartedAt: 0 };
+  state.gameOver = false;
+  gameOverShown = false;
+  state.typedBuffer = '';
+  typeInput.value = '';
+  leaderboardEl.classList.add('hidden');
+  state.running = true;
+  typeInput.focus();
+});
+
+// Hook game-over into the main loop: when state.gameOver flips, surface the modal.
+const _origTick = tick;
+window._gameOverHook = setInterval(() => {
+  if (state.gameOver && !gameOverShown) {
+    state.running = false;
+    showGameOver();
+  }
+}, 50);
+
 // ─── Init & start ────────────────────────────────────
 (async function init() {
   await fetchWordPool();
   await pollServerState();
   // Boot main loop right away — game stays in title state until name entry submitted (Task 13)
-  state.running = true;
+  state.running = !!state.playerName;
   state.spawn.waveStartedAt = state.time;
   requestAnimationFrame(tick);
 })();
