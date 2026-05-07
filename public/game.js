@@ -117,12 +117,90 @@ async function fetchWordPool() {
 }
 
 function pickWordFor(enemyDef) {
-  // For builtin sources we'd want bucket-aware selection, but words.php
-  // currently returns a flat merged array. Random pick from the full pool
-  // is acceptable for v1 — bucket bias can be added once words.php returns
-  // structured buckets in a follow-up.
-  if (state.wordPool.length === 0) return 'cat';
-  return state.wordPool[(Math.random() * state.wordPool.length) | 0];
+  if (state.pushWordPending) {
+    const w = state.pushWordPending;
+    state.pushWordPending = '';
+    return w;
+  }
+  const pool = state.wordPool;
+  if (pool.length === 0) return 'cat';
+
+  // Length-based heuristic: easy ≤5, hard ≥8, medium = the rest. Mirrors the
+  // bucketing rule used in public/words/grade-*.json. When the teacher pastes
+  // a flat list, all enemies fall back to a uniform draw.
+  const matches = pool.filter(w => {
+    if (enemyDef.difficultyClass === 'easy')   return w.length <= 5;
+    if (enemyDef.difficultyClass === 'hard')   return w.length >= 8;
+    return w.length >= 6 && w.length <= 7;
+  });
+  const source = matches.length >= 3 ? matches : pool;
+  return source[(Math.random() * source.length) | 0];
+}
+
+function updateSpawner(dt) {
+  const sp = state.spawn;
+  // Time-since-last-wave-start drives wave advancement.
+  if (state.time - sp.waveStartedAt >= WAVE_DURATION_S) {
+    sp.wave += 1;
+    sp.waveStartedAt = state.time;
+    // On boss-wave starts, drop a single hard-pool enemy as the wave's herald.
+    if (sp.wave % BOSS_WAVE_INTERVAL === 0) {
+      const bossDef = ENEMIES.find(e => e.difficultyClass === 'hard');
+      if (bossDef) spawnOne(bossDef);
+    }
+  }
+
+  // Spawn cadence ramps with wave: every (max(1.5, 4 - wave*0.2)) seconds.
+  const interval = Math.max(1.5, 4 - sp.wave * 0.2);
+  if (state.time >= sp.nextAt) {
+    sp.nextAt = state.time + interval;
+    // Pick an enemy: early waves favor easy, later mix in medium then hard.
+    const candidates = ENEMIES.filter(e => {
+      if (sp.wave < 2) return e.difficultyClass === 'easy';
+      if (sp.wave < 4) return e.difficultyClass !== 'hard';
+      return true;
+    });
+    const def = candidates[(Math.random() * candidates.length) | 0];
+    spawnOne(def);
+  }
+}
+
+let nextEnemyId = 1;
+function spawnOne(def) {
+  const word = pickWordFor(def);
+  const e = {
+    id:       'e' + (nextEnemyId++),
+    def,
+    x:        20 + Math.random() * (ARENA.w - 40),
+    y:        -20,
+    hp:       word.length,        // letter-by-letter damage
+    word,
+    typedLen: 0,
+  };
+  state.enemies.push(e);
+  addEnemyToIndex(e);
+}
+
+function updateEnemies(dt) {
+  const survivors = [];
+  for (const e of state.enemies) {
+    // Walk straight toward hero
+    const dx = state.hero.x - e.x, dy = state.hero.y - e.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const sp = e.def.speed * dt;
+    e.x += (dx / dist) * sp;
+    e.y += (dy / dist) * sp;
+    // Contact?
+    if (dist < (e.def.size + HERO.size) * 0.4) {
+      state.hero.hp = Math.max(0, state.hero.hp - e.def.contactDamage);
+      removeEnemyFromIndex(e);
+      // do not add to survivors
+      if (state.hero.hp === 0) state.gameOver = true;
+      continue;
+    }
+    survivors.push(e);
+  }
+  state.enemies = survivors;
 }
 
 // ─── Polling ─────────────────────────────────────────
@@ -190,8 +268,26 @@ function render() {
 
   // Enemies (Task 10 fills in real rendering)
   for (const e of state.enemies) {
-    ctx.font = `${e.def.size || 32}px serif`;
+    ctx.font = `${e.def.size}px serif`;
+    ctx.fillStyle = '#fff';
     ctx.fillText(e.def.emoji, e.x, e.y);
+
+    // Word above the enemy
+    ctx.font = '14px ui-monospace, monospace';
+    const word = e.word;
+    const typed = word.slice(0, e.typedLen);
+    const rest  = word.slice(e.typedLen);
+    const wY = e.y - e.def.size / 2 - 8;
+    // Background pill
+    const padding = 6, w = ctx.measureText(word).width;
+    ctx.fillStyle = '#1a2238';
+    ctx.fillRect(e.x - w/2 - padding, wY - 12, w + padding*2, 22);
+    // Typed (green)
+    ctx.fillStyle = '#06d6a0';
+    ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);
+    // Untyped (white)
+    ctx.fillStyle = '#cde';
+    ctx.fillText(rest, e.x - w/2 + ctx.measureText(typed).width + ctx.measureText(rest).width/2, wY);
   }
 
   // HUD placeholder text — replaced in Task 12
@@ -222,7 +318,8 @@ function tick(now) {
   lastTs = now;
   if (state.running && !state.paused && !state.personalPaused && !state.gameOver) {
     state.time += dt;
-    // updateEnemies / updateSpawner / updateParticles land in Task 10
+    updateSpawner(dt);
+    updateEnemies(dt);
   }
   render();
   requestAnimationFrame(tick);
