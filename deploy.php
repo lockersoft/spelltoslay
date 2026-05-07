@@ -15,7 +15,7 @@ require 'recipe/common.php';
 // changes that would break DreamHost's per-site SSL/cert management.
 
 set('application',  'spelltoslay');
-set('repository',   'github-spelltoslay:lockersoft/spelltoslay.git'); // SSH alias on the server
+set('repository',   'github.com:lockersoft/spelltoslay.git'); // server's ~/.ssh/config has Host github.com → id_ed25519_github_lockersoft
 set('default_stage', 'production');
 
 host('production')

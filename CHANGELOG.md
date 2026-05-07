@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- `public/favicon.svg` — sword-on-dark icon, referenced from index.html and teacher.html.
+
+### Changed
+- `deploy.php` repository URL switched from `github-spelltoslay:` (alias never set up server-side) to `github.com:lockersoft/spelltoslay.git`, which uses the server's existing github.com SSH config.
+- `composer.lock` content-hash refreshed against composer.json so production `composer install` no longer warns.
+
 ## [0.1.0] — 2026-05-06
 
 Initial SpellToSlay v1 release. Forked from SLAY's infrastructure;

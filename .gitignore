@@ -36,6 +36,7 @@ node_modules/
 test-results/
 playwright-report/
 .playwright/
+.playwright-mcp/
 
 # Build version — written by deploy:write_version, lives only on the server
 VERSION
