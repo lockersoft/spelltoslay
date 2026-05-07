@@ -76,4 +76,51 @@ class ScoreTest extends TestCase
         $this->assertSame(429, $status);
         $this->assertStringContainsString('rate', strtolower($json['error']));
     }
+
+    public function testAcceptsNewTypingFields(): void
+    {
+        [$status, , $json] = sts_invoke(
+            'score.php', 'POST', [],
+            ['name' => 'Pat', 'score' => 1240, 'wave' => 3, 'duration' => 184,
+             'wpm' => 42, 'accuracy' => 94, 'wordsSlain' => 38]
+        );
+        $this->assertSame(200, $status);
+        $this->assertArrayHasKey('rank', $json);
+
+        $row = sts_db()->query("SELECT wpm, accuracy, words_slain FROM scores WHERE name='Pat'")->fetch();
+        $this->assertSame(42, (int)$row['wpm']);
+        $this->assertSame(94, (int)$row['accuracy']);
+        $this->assertSame(38, (int)$row['words_slain']);
+    }
+
+    public function testRejectsImplausibleWpm(): void
+    {
+        [$status] = sts_invoke(
+            'score.php', 'POST', [],
+            ['name' => 'Q', 'score' => 1, 'wave' => 1, 'duration' => 1, 'wpm' => 9999]
+        );
+        $this->assertSame(400, $status);
+    }
+
+    public function testRejectsImplausibleAccuracy(): void
+    {
+        [$status] = sts_invoke(
+            'score.php', 'POST', [],
+            ['name' => 'Q', 'score' => 1, 'wave' => 1, 'duration' => 1, 'accuracy' => 200]
+        );
+        $this->assertSame(400, $status);
+    }
+
+    public function testLegacyPayloadStillAccepted(): void
+    {
+        [$status] = sts_invoke(
+            'score.php', 'POST', [],
+            ['name' => 'Legacy', 'score' => 100, 'wave' => 2, 'duration' => 30]
+        );
+        $this->assertSame(200, $status);
+        $row = sts_db()->query("SELECT wpm, accuracy, words_slain FROM scores WHERE name='Legacy'")->fetch();
+        $this->assertSame(0, (int)$row['wpm']);
+        $this->assertSame(0, (int)$row['accuracy']);
+        $this->assertSame(0, (int)$row['words_slain']);
+    }
 }

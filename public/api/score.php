@@ -13,6 +13,9 @@ $name     = trim((string)($body['name']     ?? ''));
 $score    = $body['score']    ?? null;
 $wave     = $body['wave']     ?? null;
 $duration = $body['duration'] ?? null;
+$wpm        = $body['wpm']        ?? 0;
+$accuracy   = $body['accuracy']   ?? 0;
+$wordsSlain = $body['wordsSlain'] ?? 0;
 
 // Validation.
 if ($name === '' || mb_strlen($name) > 16) {
@@ -29,10 +32,19 @@ foreach (['score' => $score, 'wave' => $wave, 'duration' => $duration] as $f => 
         return;
     }
 }
+foreach (['wpm' => $wpm, 'accuracy' => $accuracy, 'wordsSlain' => $wordsSlain] as $f => $v) {
+    if (!is_int($v) || $v < 0) {
+        sts_json(400, ['error' => "$f must be a non-negative integer"]);
+        return;
+    }
+}
 // Plausibility ceilings (anti-spam, anti-cheat-lite).
 if ($score > 1_000_000)   { sts_json(400, ['error' => 'score implausible']); return; }
 if ($wave > 1000)         { sts_json(400, ['error' => 'wave implausible']); return; }
 if ($duration > 7200)     { sts_json(400, ['error' => 'duration implausible']); return; }
+if ($wpm > 200)           { sts_json(400, ['error' => 'wpm implausible']);        return; }
+if ($accuracy > 100)      { sts_json(400, ['error' => 'accuracy implausible']);   return; }
+if ($wordsSlain > 5000)   { sts_json(400, ['error' => 'wordsSlain implausible']); return; }
 
 // Profanity check (shared wordlist in _bootstrap.php).
 if (sts_is_profane($name)) {
@@ -58,14 +70,17 @@ if ($count > 0) {
 }
 
 $ins = $db->prepare(
-    'INSERT INTO scores (name, score, wave, duration, ip, submitted_at)
-     VALUES (:name, :score, :wave, :duration, :ip, :ts)'
+    'INSERT INTO scores (name, score, wave, duration, wpm, accuracy, words_slain, ip, submitted_at)
+     VALUES (:name, :score, :wave, :duration, :wpm, :accuracy, :ws, :ip, :ts)'
 );
 $ins->execute([
     ':name'     => $name,
     ':score'    => $score,
     ':wave'     => $wave,
     ':duration' => $duration,
+    ':wpm'      => $wpm,
+    ':accuracy' => $accuracy,
+    ':ws'       => $wordsSlain,
     ':ip'       => $ip,
     ':ts'       => sts_now(),
 ]);
