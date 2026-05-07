@@ -42,6 +42,7 @@ const state = {
   wordSource: '',
   wordListVersion: -1,
   pushWordPending: '',
+  lastPushWordConsumed: '',
   // Inherited polling
   serverVersion: -1,
   clientId: null,
@@ -402,9 +403,15 @@ async function pollServerState() {
     await fetchWordPool();
   }
 
-  // Push word: queue exactly once.
-  if (s.pushWord && s.pushWord !== state.pushWordPending) {
+  // Push word: queue exactly once. Server clears push_word after a 10s TTL,
+  // but during that window we may receive the same word on multiple polls —
+  // guard with state.lastPushWordConsumed so we only queue it the first time.
+  if (s.pushWord && s.pushWord !== state.lastPushWordConsumed) {
     state.pushWordPending = s.pushWord;
+    state.lastPushWordConsumed = s.pushWord;
+  }
+  if (!s.pushWord) {
+    state.lastPushWordConsumed = '';
   }
 
   // Polls — capture state AND render the overlay (ported from SLAY).
@@ -412,6 +419,16 @@ async function pollServerState() {
 }
 setInterval(pollServerState, 2000);
 document.addEventListener('visibilitychange', () => { state.tabVisible = !document.hidden; });
+
+// Wire the build-version display from /api/health.php
+(async () => {
+  try {
+    const r = await fetch('/api/health.php', { cache: 'no-store' });
+    const j = await r.json();
+    const el = document.getElementById('build-version');
+    if (el && j.version) el.textContent = 'v' + j.version;
+  } catch (_) { /* ignore */ }
+})();
 
 // ─── Poll overlay ────────────────────────────────────
 // The overlay sits on top of the canvas, so we auto-dismiss it 15 seconds

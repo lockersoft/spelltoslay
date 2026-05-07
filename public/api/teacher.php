@@ -173,7 +173,13 @@ switch ($action) {
         $db->beginTransaction();
         try {
             $db->exec('DELETE FROM teacher_word_list');
-            $stmt = $db->prepare("UPDATE state SET word_source = 'builtin:' || grade_level, word_list_version=word_list_version+1, version=version+1 WHERE id=1");
+            $stmt = $db->prepare(
+                "UPDATE state
+                 SET word_source = CASE WHEN grade_level = 0 THEN 'builtin:K' ELSE 'builtin:' || grade_level END,
+                     word_list_version = word_list_version + 1,
+                     version = version + 1
+                 WHERE id = 1"
+            );
             $stmt->execute();
             $db->commit();
         } catch (\Throwable $e) {

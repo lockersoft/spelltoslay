@@ -327,6 +327,20 @@ class TeacherTest extends TestCase
         $this->assertSame('builtin:6', $st['word_source']);
     }
 
+    public function testClearWordListMapsGradeZeroToK(): void
+    {
+        sts_db()->exec("INSERT INTO teacher_word_list (word, position, set_at) VALUES ('x',0,1)");
+        sts_db()->exec("UPDATE state SET word_source='teacher', grade_level=0 WHERE id=1");
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'clearWordList']
+        );
+        $this->assertSame(200, $status);
+        $st = sts_db()->query('SELECT word_source FROM state WHERE id=1')->fetch();
+        $this->assertSame('builtin:K', $st['word_source']);
+    }
+
     public function testSetGradeLevelUpdatesStateOnlyWhenBuiltinActive(): void
     {
         [$status] = sts_invoke(
