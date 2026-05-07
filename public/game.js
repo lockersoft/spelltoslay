@@ -203,6 +203,115 @@ function updateEnemies(dt) {
   state.enemies = survivors;
 }
 
+// ─── Typing input ────────────────────────────────────
+const typeInput = document.getElementById('type-input');
+
+function onType() {
+  if (!state.running || state.gameOver || state.paused || state.personalPaused) {
+    typeInput.value = '';
+    return;
+  }
+  const raw = typeInput.value.toLowerCase().replace(/[^a-z]/g, '');
+  const prev = state.typedBuffer;
+
+  // Pure backspace? Just shrink the buffer.
+  if (raw.length < prev.length) {
+    state.typedBuffer = raw;
+    refreshLock();
+    return;
+  }
+
+  // Process new keystrokes one at a time.
+  for (let i = prev.length; i < raw.length; i++) {
+    const ch = raw[i];
+    state.keystrokes.total += 1;
+    const candidatePrefix = state.typedBuffer + ch;
+    if (prefixIndex.has(candidatePrefix)) {
+      // Correct letter (the buffer extends a real prefix of at least one live enemy).
+      state.typedBuffer = candidatePrefix;
+      state.keystrokes.correct += 1;
+      state.wpmLog.push({ ts: state.time, chars: 1 });
+      damageLockedByOne();
+    } else {
+      // Wrong letter — typo penalty, undo the buffer growth, and refuse to advance.
+      state.hero.hp = Math.max(0, state.hero.hp - TYPO_HP_PENALTY);
+      if (state.hero.hp === 0) state.gameOver = true;
+      state.streak = 0;
+      // Mark the input as "stalled" — keep the wrong letter in the input box (red flash via CSS),
+      // require Backspace to recover.
+      typeInput.classList.add('stalled');
+      typeInput.value = state.typedBuffer + ch;
+      flashLockedRed();
+      return;
+    }
+  }
+  typeInput.classList.remove('stalled');
+  typeInput.value = state.typedBuffer;
+  refreshLock();
+}
+
+function refreshLock() {
+  if (state.typedBuffer === '') {
+    state.lockedEnemyId = null;
+    return;
+  }
+  const candidates = prefixIndex.get(state.typedBuffer);
+  if (!candidates || candidates.size === 0) {
+    state.lockedEnemyId = null;
+    return;
+  }
+  // Among matches, pick the one closest to the hero (Euclidean).
+  let bestId = null, bestDist = Infinity;
+  for (const id of candidates) {
+    const e = state.enemies.find(en => en.id === id);
+    if (!e) continue;
+    const d = Math.hypot(e.x - state.hero.x, e.y - state.hero.y);
+    if (d < bestDist) { bestDist = d; bestId = id; }
+  }
+  state.lockedEnemyId = bestId;
+  const locked = state.enemies.find(e => e.id === bestId);
+  if (locked) locked.typedLen = state.typedBuffer.length;
+}
+
+function damageLockedByOne() {
+  refreshLock();
+  const e = state.enemies.find(en => en.id === state.lockedEnemyId);
+  if (!e) return;
+  e.typedLen = state.typedBuffer.length;
+  e.hp -= 1;
+  if (e.hp <= 0) {
+    onEnemySlain(e);
+  }
+}
+
+function onEnemySlain(e) {
+  const word = e.word;
+  // Score: floor(wordLength × pointMultiplier × streakBonus)
+  const streakBonus = Math.min(1 + 0.05 * state.streak, 2.0);
+  const points = Math.floor(word.length * e.def.pointMultiplier * streakBonus);
+  state.score += points;
+  state.kills += 1;
+  state.streak += 1;
+  if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+  // Remove
+  removeEnemyFromIndex(e);
+  state.enemies = state.enemies.filter(en => en.id !== e.id);
+  // Reset buffer; lock will refresh on next keystroke
+  state.typedBuffer = '';
+  state.lockedEnemyId = null;
+  typeInput.value = '';
+}
+
+function flashLockedRed() {
+  const e = state.enemies.find(en => en.id === state.lockedEnemyId);
+  if (!e) return;
+  e.flashUntil = state.time + 0.4;
+}
+
+typeInput.addEventListener('input', onType);
+typeInput.addEventListener('blur',  () => setTimeout(() => typeInput.focus(), 50));
+window.addEventListener('load',     () => typeInput.focus());
+
 // ─── Polling ─────────────────────────────────────────
 async function pollServerState() {
   const params = new URLSearchParams({ cid: state.clientId });
@@ -257,6 +366,7 @@ document.addEventListener('visibilitychange', () => { state.tabVisible = !docume
 
 // ─── Render ──────────────────────────────────────────
 function render() {
+  if (state.typedBuffer !== '') refreshLock();
   ctx.clearRect(0, 0, ARENA.w, ARENA.h);
   // Background
   ctx.fillStyle = '#0b1220';
@@ -271,6 +381,22 @@ function render() {
     ctx.font = `${e.def.size}px serif`;
     ctx.fillStyle = '#fff';
     ctx.fillText(e.def.emoji, e.x, e.y);
+
+    // Locked ring
+    if (e.id === state.lockedEnemyId) {
+      ctx.strokeStyle = '#5b8def';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.def.size * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Red flash on typo
+    if (e.flashUntil && state.time < e.flashUntil) {
+      ctx.fillStyle = 'rgba(239, 71, 111, 0.4)';
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.def.size * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Word above the enemy
     ctx.font = '14px ui-monospace, monospace';
