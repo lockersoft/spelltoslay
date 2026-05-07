@@ -174,3 +174,39 @@ button { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; f
 .contributors-list li { padding: 4px 0; border-bottom: 1px solid #21262d; }
 .contributors-list .contrib-name { font-weight: 700; color: var(--accent); }
 .contributors-list .contrib-version { font: 11px ui-monospace, monospace; color: #6e7681; }
+
+/* SpellToSlay v1: typing input pinned beneath the canvas */
+.type-input {
+  display: block;
+  width: 60%;
+  max-width: 480px;
+  margin: 8px auto 0;
+  padding: 10px 14px;
+  background: #1a2238;
+  color: #cde;
+  border: 2px solid #5b8def;
+  border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 18px;
+  letter-spacing: 1px;
+  outline: none;
+  text-align: center;
+}
+.type-input:focus { border-color: #06d6a0; }
+.type-input.stalled {
+  border-color: #ef476f;
+  background: #2a1224;
+  animation: stall-shake 0.3s;
+}
+@keyframes stall-shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+/* Canvas background — gives the dark stage a frame */
+#arena {
+  background: #0b1220;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+}
