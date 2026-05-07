@@ -3,9 +3,9 @@
 Lightweight, hand-curated grade-level word pools, one JSON file per grade
 (K through 8). Each file has three difficulty buckets:
 
-- `easy`   — ≤ 5 letters, common words.
-- `medium` — 6–7 letters or moderately common.
-- `hard`   — ≥ 8 letters or low-frequency.
+- `easy`   — short common words (≤ 6 letters).
+- `medium` — moderately common words, typically 6–10 letters.
+- `hard`   — tricky-to-spell words; length is not bounded (e.g. "rhythm", "seize").
 
 The day-one lists were compiled from a mix of public-domain sources
 (Dolch sight-word list for K–3, frequency-banded common-English vocabulary
