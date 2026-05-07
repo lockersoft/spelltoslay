@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SLAY</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="game-root">
+    <header class="topbar">
+      <h1>SLAY</h1>
+      <div class="hud" id="hud">
+        <span id="hud-hp"></span>
+        <span id="hud-score"></span>
+        <span id="hud-wave"></span>
+        <span id="hud-time"></span>
+      </div>
+    </header>
+
+    <div class="stage">
+      <canvas id="arena" width="960" height="600"></canvas>
+
+      <div id="overlay" class="overlay hidden" aria-live="polite"></div>
+
+      <!-- Feature 12: Poll overlay (non-blocking, stays over game) -->
+      <div id="poll-overlay" class="poll-overlay hidden">
+        <h3 id="poll-question"></h3>
+        <div id="poll-options" class="poll-options"></div>
+      </div>
+
+      <div id="name-entry" class="modal hidden">
+        <h2>Welcome to SLAY</h2>
+        <p>What's your name? (1–16 letters/numbers/spaces)</p>
+        <label><input id="entry-name" maxlength="16" autocomplete="off" placeholder="Your name"></label>
+        <button id="start-playing">Start playing</button>
+        <p id="entry-error" class="error hidden"></p>
+      </div>
+
+      <div id="game-over" class="modal hidden">
+        <h2>You died</h2>
+        <p id="game-over-summary"></p>
+        <p>Submitting as <strong id="game-over-name"></strong> · <a href="#" id="change-name">Change name</a></p>
+        <button id="submit-score">Submit score</button>
+        <p id="submit-error" class="error hidden"></p>
+      </div>
+
+      <div id="leaderboard" class="modal hidden">
+        <h2>Leaderboard</h2>
+        <p id="rank-summary"></p>
+        <h3>Today</h3>
+        <ol id="lb-today"></ol>
+        <h3>All time</h3>
+        <ol id="lb-alltime"></ol>
+        <button id="play-again">Play again</button>
+      </div>
+    </div>
+
+    <div class="footer-row">
+      <p class="message-bar" id="message-bar"></p>
+      <span class="build-version" id="build-version" title="Build version (auto-bumps on each deploy)">v…</span>
+    </div>
+  </main>
+
+  <script src="/game.js" defer></script>
+</body>
+</html>

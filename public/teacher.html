@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SLAY · Teacher Control</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="teacher">
+  <main id="teacher-root">
+    <header class="topbar">
+      <h1>SLAY · Teacher Control</h1>
+      <div class="hud"><span id="player-count">● 0 players</span></div>
+    </header>
+
+    <section id="auth-gate" class="modal" style="position:static;transform:none;margin-top:40px">
+      <h2>Access required</h2>
+      <p>Open this page with <code>?key=&lt;your-teacher-key&gt;</code>.</p>
+    </section>
+
+    <section id="control-panel" class="hidden">
+      <button id="pause-btn" class="big-button">⏸ PAUSE EVERYONE</button>
+
+      <div class="row">
+        <label style="flex:1">
+          Message shown to class:
+          <input id="msg-input" maxlength="200" placeholder="Eyes up front…">
+        </label>
+        <button id="send-msg">Send</button>
+        <button id="clear-msg" class="secondary">Clear</button>
+      </div>
+
+      <div class="row">
+        <button id="reload-all" class="secondary">🔄 Force everyone to reload</button>
+        <button id="clear-board" class="danger">🗑 Clear leaderboard</button>
+      </div>
+
+      <h3>Players online (<span id="roster-count">0</span>)</h3>
+      <div id="roster" class="roster"></div>
+
+      <h3>Live top-5</h3>
+      <ol id="live-top"></ol>
+
+      <h3>Live Poll</h3>
+      <div id="poll-section">
+        <div id="poll-form">
+          <div class="row">
+            <label style="flex:1">
+              Question:
+              <input id="poll-question-input" maxlength="200" placeholder="Ask the class a question…">
+            </label>
+          </div>
+          <div class="row" style="flex-wrap:wrap;gap:6px">
+            <input class="poll-opt" maxlength="40" placeholder="Option A">
+            <input class="poll-opt" maxlength="40" placeholder="Option B">
+            <input class="poll-opt" maxlength="40" placeholder="Option C">
+            <input class="poll-opt" maxlength="40" placeholder="Option D">
+          </div>
+          <button id="start-poll-btn">▶ Start poll</button>
+        </div>
+        <div id="poll-active" class="hidden">
+          <p id="poll-active-question" style="font-weight:700;margin:0 0 8px"></p>
+          <div id="poll-tally"></div>
+          <button id="end-poll-btn" class="secondary" style="margin-top:8px">■ End poll</button>
+        </div>
+      </div>
+
+      <h3>Contributors</h3>
+      <ul id="contributors-list" class="contributors-list"></ul>
+
+      <p id="teacher-error" class="error hidden"></p>
+    </section>
+  </main>
+
+  <script src="/teacher.js" defer></script>
+</body>
+</html>

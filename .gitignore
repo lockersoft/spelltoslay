@@ -1,0 +1,41 @@
+# Brainstorming companion artifacts
+.superpowers/
+
+# Local Claude Code state
+.claude/
+
+# Worktrees for parallel feature work
+.worktrees/
+
+# Local config (deployed via Deployer shared/)
+config/config.php
+
+# SQLite DB (lives in shared/data/ on server, never in repo)
+data/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# PHP
+vendor/
+
+# Node (in case we ever add a build tool)
+node_modules/
+
+# Deployer
+.dep/
+.env
+
+# PHPUnit cache
+.phpunit.cache/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+.playwright/
+
+# Build version — written by deploy:write_version, lives only on the server
+VERSION

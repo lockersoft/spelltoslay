@@ -1,0 +1,12 @@
+# SLAY ships fresh code mid-class — every "Force everyone to reload" needs
+# to actually pick up the latest game.js, not a cached copy. DreamHost's
+# default cache lifetime for static files is 30 days, so without this
+# students keep seeing yesterday's build until their cache expires.
+#
+# Disable caching on the dynamic-content extensions; let images/fonts
+# inherit the host default (those rarely change).
+<FilesMatch "\.(js|html|css)$">
+  Header set Cache-Control "no-store"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>

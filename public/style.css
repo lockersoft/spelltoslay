@@ -1,0 +1,176 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --ink: #e6edf3;
+  --accent: #ffd76b;
+  --danger: #ff6b6b;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  height: 100%;
+}
+
+#game-root {
+  display: flex; flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding: 12px;
+  gap: 12px;
+}
+
+.topbar {
+  display: flex; justify-content: space-between; align-items: baseline;
+  width: 100%; max-width: 960px;
+}
+.topbar h1 { margin: 0; font-size: 24px; letter-spacing: 2px; color: var(--accent); }
+.hud { display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
+
+.stage {
+  position: relative;
+  width: 960px; max-width: 100%;
+}
+#arena {
+  display: block; width: 100%; height: auto;
+  background: #1a1d2e;
+  border: 2px solid #2a2d3e; border-radius: 8px;
+}
+
+.overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.78);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  text-align: center; padding: 24px;
+  font-size: 28px; font-weight: 700; letter-spacing: 1px;
+  border-radius: 8px;
+}
+.overlay .sub { font-size: 18px; font-weight: 400; opacity: .9; max-width: 600px; }
+
+.hidden { display: none !important; }
+
+.modal {
+  position: absolute; inset: 50% auto auto 50%;
+  transform: translate(-50%,-50%);
+  background: var(--panel);
+  padding: 24px; border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  min-width: 320px; max-width: 90%;
+}
+.modal h2 { margin-top: 0; }
+.modal label { display: block; margin: 12px 0; }
+.modal input, .modal button {
+  font: inherit; padding: 8px 12px;
+  border-radius: 6px; border: 1px solid #444;
+  background: #0d1117; color: var(--ink);
+}
+.modal button {
+  background: var(--accent); color: #0d1117; font-weight: 700;
+  cursor: pointer; border: none;
+}
+.error { color: var(--danger); }
+
+.footer-row {
+  display: flex; align-items: center; gap: 8px;
+  width: 960px; max-width: 100%;
+}
+.message-bar {
+  flex: 1;
+  min-height: 24px;
+  background: #1a2332;
+  color: var(--accent);
+  padding: 6px 12px; border-radius: 6px;
+  margin: 0;
+}
+.message-bar:empty { visibility: hidden; }
+.build-version {
+  color: #6e7681;
+  font: 12px ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+  user-select: all;
+}
+
+#leaderboard ol { padding-left: 20px; max-height: 220px; overflow-y: auto; }
+#leaderboard li { padding: 2px 0; }
+
+.teacher #teacher-root { width: 720px; max-width: 100%; }
+.big-button {
+  display: block; width: 100%;
+  padding: 28px; margin: 24px 0;
+  font-size: 22px; font-weight: 800; letter-spacing: 1px;
+  border: none; border-radius: 12px;
+  background: var(--danger); color: #fff;
+  cursor: pointer;
+}
+.big-button.resumed { background: #2ea043; }
+.row { display: flex; gap: 8px; align-items: end; margin: 16px 0; }
+.row input { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #444; background:#0d1117; color: var(--ink); }
+button.secondary { background: #30363d; color: var(--ink); }
+button.danger    { background: var(--danger); color: #fff; }
+button { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font: inherit; }
+#live-top { padding-left: 20px; }
+
+.roster { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; padding-right: 8px; }
+.roster-row { display: flex; align-items: center; gap: 8px; background: #0d1117; padding: 6px 8px; border-radius: 6px; border: 1px solid #30363d; }
+.roster-name { min-width: 110px; font-weight: 600; }
+.roster-msg { flex: 1; padding: 6px 8px; border-radius: 4px; border: 1px solid #444; background: #161b22; color: var(--ink); font: inherit; }
+.pause-personal { background: var(--danger); color: #fff; }
+.pause-personal.paused { background: #2ea043; }
+
+/* Feature 2: Activity dots */
+.activity-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.activity-dot.green  { background: #3fb950; }
+.activity-dot.yellow { background: #d29922; }
+.activity-dot.red    { background: #f85149; }
+
+/* Feature 1: Roster stats */
+.roster-stat { font: 12px ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; opacity: .85; }
+
+/* Feature 8: Inline rename */
+.roster-name.editable { cursor: pointer; }
+.roster-name.editable:hover { text-decoration: underline; }
+.roster-name-input { width: 100px; padding: 4px 6px; border-radius: 4px; border: 1px solid #444; background: #161b22; color: var(--ink); font: inherit; }
+.rename-btn {
+  background: transparent; border: 1px solid #30363d;
+  padding: 2px 6px; font-size: 12px; line-height: 1;
+  opacity: .55; transition: opacity .15s;
+  flex: none;
+}
+.rename-btn:hover { opacity: 1; border-color: var(--accent); }
+
+/* Feature 12: Poll overlay on game canvas */
+.poll-overlay {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(13,17,23,0.95); border: 1px solid var(--accent);
+  border-radius: 8px; padding: 14px 18px; min-width: 320px; max-width: 600px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  z-index: 10;
+}
+.poll-overlay h3 { margin: 0 0 10px; font-size: 16px; }
+.poll-overlay .poll-options { display: flex; flex-direction: column; gap: 6px; }
+.poll-overlay button {
+  padding: 8px 12px; border-radius: 4px; border: 1px solid #30363d;
+  background: #161b22; color: var(--ink); font: inherit; cursor: pointer;
+  text-align: left;
+}
+.poll-overlay button:hover:not(:disabled) { border-color: var(--accent); }
+.poll-overlay button.answered { background: var(--accent); color: #0d1117; font-weight: 700; }
+.poll-overlay button:disabled { cursor: default; }
+
+/* Feature 12: Poll tally bars in teacher panel */
+.poll-tally-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.poll-tally-label { min-width: 100px; }
+.poll-tally-fill { background: var(--accent); height: 16px; border-radius: 3px; }
+.poll-tally-count { min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Feature 3: Contributors list */
+.contributors-list { padding-left: 0; list-style: none; }
+.contributors-list li { padding: 4px 0; border-bottom: 1px solid #21262d; }
+.contributors-list .contrib-name { font-weight: 700; color: var(--accent); }
+.contributors-list .contrib-version { font: 11px ui-monospace, monospace; color: #6e7681; }
