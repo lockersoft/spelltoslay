@@ -5,9 +5,11 @@
 ### Added
 - `public/favicon.svg` — sword-on-dark icon, referenced from index.html and teacher.html.
 - E2E regression test for the name-entry focus-steal bug.
+- Space / Enter as an explicit "commit current buffer" key. Needed when one live enemy's word is a prefix of another's (e.g. `a` and `and` both alive): typing `a` alone is ambiguous, so the player presses Space to commit the slay.
 
 ### Fixed
 - Name-entry sign-in: typing your name now works. The gameplay typing input's blur-recapture (refocus 50ms after losing focus) was unconditional and stole focus from `#entry-name` mid-keystroke. Recapture now requires `state.running`, which is false while any modal is up.
+- Prefix-collision typing: when two enemies shared a prefix (e.g. `cat` + `carry`), per-keystroke "lock to closest" damage meant typing the full word of one didn't slay it — the early letters landed on the wrong enemy and only the last letter hit the intended target. Damage is now deferred while the prefix is ambiguous and flushed in one shot when the buffer commits to a single enemy. Typing the full word always slays it; backspace no longer heals (damage is monotone).
 
 ### Changed
 - `deploy.php` repository URL switched from `github-spelltoslay:` (alias never set up server-side) to `github.com:lockersoft/spelltoslay.git`, which uses the server's existing github.com SSH config.

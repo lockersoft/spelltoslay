@@ -263,7 +263,7 @@ function onType() {
       state.typedBuffer = candidatePrefix;
       state.keystrokes.correct += 1;
       state.wpmLog.push({ ts: state.time, chars: 1 });
-      damageLockedByOne();
+      commitOrLock();
     } else {
       // Wrong letter — typo penalty, undo the buffer growth, and refuse to advance.
       state.hero.hp = Math.max(0, state.hero.hp - TYPO_HP_PENALTY);
@@ -279,8 +279,44 @@ function onType() {
   }
   typeInput.classList.remove('stalled');
   typeInput.value = state.typedBuffer;
-  refreshLock();
 }
+
+// Space/Enter: explicit commit when the buffer matches a live enemy's full word.
+// Needed for prefix-of-another cases (e.g. "a" vs "and"): typing 'a' alone leaves
+// the lock ambiguous, so without an explicit commit the player can't slay the
+// shorter word while the longer one is alive.
+typeInput.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  if (!state.running || state.gameOver || state.paused || state.personalPaused) return;
+  if (state.typedBuffer === '') return;
+  ev.preventDefault();
+  const candidates = prefixIndex.get(state.typedBuffer);
+  if (!candidates) return;
+  const exact = [];
+  for (const id of candidates) {
+    const e = state.enemies.find(en => en.id === id);
+    if (e && e.word === state.typedBuffer) exact.push(e);
+  }
+  if (exact.length === 0) {
+    // Buffer isn't a complete word of any live enemy — premature commit = typo.
+    state.hero.hp = Math.max(0, state.hero.hp - TYPO_HP_PENALTY);
+    if (state.hero.hp === 0) state.gameOver = true;
+    state.streak = 0;
+    typeInput.classList.add('stalled');
+    flashLockedRed();
+    return;
+  }
+  let best = exact[0];
+  let bestDist = Math.hypot(best.x - state.hero.x, best.y - state.hero.y);
+  for (let i = 1; i < exact.length; i++) {
+    const d = Math.hypot(exact[i].x - state.hero.x, exact[i].y - state.hero.y);
+    if (d < bestDist) { bestDist = d; best = exact[i]; }
+  }
+  state.lockedEnemyId = best.id;
+  best.typedLen = state.typedBuffer.length;
+  best.hp = 0;
+  onEnemySlain(best);
+});
 
 function refreshLock() {
   if (state.typedBuffer === '') {
@@ -305,15 +341,58 @@ function refreshLock() {
   if (locked) locked.typedLen = state.typedBuffer.length;
 }
 
-function damageLockedByOne() {
-  refreshLock();
-  const e = state.enemies.find(en => en.id === state.lockedEnemyId);
-  if (!e) return;
-  e.typedLen = state.typedBuffer.length;
-  e.hp -= 1;
-  if (e.hp <= 0) {
-    onEnemySlain(e);
+// Decide what (if anything) to do after the buffer has been extended by one
+// valid keystroke. Damage is deferred while the prefix matches multiple live
+// enemies; once the lock disambiguates to a single enemy, damage equal to
+// buffer.length is applied (monotone — backspace doesn't heal). When the
+// buffer exactly matches a live enemy's word and no other live enemy could
+// extend the buffer further, the slay fires immediately.
+function commitOrLock() {
+  const buf = state.typedBuffer;
+  const candidates = prefixIndex.get(buf);
+  if (!candidates || candidates.size === 0) return;
+
+  const exactMatches = [];
+  let extendingCount = 0;
+  for (const id of candidates) {
+    const e = state.enemies.find(en => en.id === id);
+    if (!e) continue;
+    if (e.word === buf) exactMatches.push(e);
+    else if (e.word.length > buf.length) extendingCount += 1;
   }
+
+  if (exactMatches.length === 1 && extendingCount === 0) {
+    const e = exactMatches[0];
+    state.lockedEnemyId = e.id;
+    e.typedLen = buf.length;
+    e.hp = 0;
+    onEnemySlain(e);
+    return;
+  }
+
+  if (candidates.size === 1) {
+    const id = [...candidates][0];
+    const e = state.enemies.find(en => en.id === id);
+    if (!e) return;
+    const target = e.word.length - buf.length;
+    if (target < e.hp) e.hp = target;
+    e.typedLen = buf.length;
+    state.lockedEnemyId = e.id;
+    if (e.hp <= 0) onEnemySlain(e);
+    return;
+  }
+
+  // Ambiguous — no damage. Visual lock to closest among prefix-matchers.
+  let bestId = null, bestDist = Infinity;
+  for (const id of candidates) {
+    const e = state.enemies.find(en => en.id === id);
+    if (!e) continue;
+    const d = Math.hypot(e.x - state.hero.x, e.y - state.hero.y);
+    if (d < bestDist) { bestDist = d; bestId = id; }
+  }
+  state.lockedEnemyId = bestId;
+  const locked = state.enemies.find(e => e.id === bestId);
+  if (locked) locked.typedLen = buf.length;
 }
 
 function onEnemySlain(e) {
