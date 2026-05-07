@@ -76,6 +76,21 @@ async function refreshState() {
         document.querySelectorAll('.poll-opt').forEach(el => el.value = '');
       }
     }
+
+    // Word pool — active-source label + grade dropdown sync
+    if (s.wordSource) {
+      const label = s.wordSource === 'teacher'
+        ? 'Active: teacher list'
+        : 'Active: built-in (grade ' + s.wordSource.split(':')[1] + ')';
+      const lbl = document.getElementById('active-source');
+      if (lbl) lbl.textContent = label;
+
+      if (s.wordSource.startsWith('builtin:') && document.activeElement !== gradeSelect) {
+        const g = s.wordSource.split(':')[1];
+        const newVal = (g === 'K') ? '0' : g;
+        if (gradeSelect && gradeSelect.value !== newVal) gradeSelect.value = newVal;
+      }
+    }
   } catch (_) { /* ignore */ }
 }
 
@@ -405,19 +420,3 @@ pushWordBtn.addEventListener('click', async () => {
     pushWordInput.value = '';
   } catch (_) {}
 });
-
-// Render active-source label whenever state refreshes.
-const _origRefreshState = refreshState;
-refreshState = async function () {
-  await _origRefreshState();
-  // Read state once more, just for the source/version display (refreshState
-  // doesn't expose it; tiny extra fetch is fine at 2s cadence).
-  try {
-    const s = await (await fetch('/api/state.php?cid=teacher-panel', {cache:'no-store'})).json();
-    activeSourceEl.textContent = `Active: ${s.wordSource === 'teacher' ? 'teacher list' : 'built-in (grade ' + s.wordSource.split(':')[1] + ')'}`;
-    if (s.wordSource && s.wordSource.startsWith('builtin:') && document.activeElement !== gradeSelect) {
-      const g = s.wordSource.split(':')[1];
-      gradeSelect.value = g === 'K' ? '0' : g;
-    }
-  } catch (_) {}
-};
