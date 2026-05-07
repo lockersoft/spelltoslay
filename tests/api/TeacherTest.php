@@ -350,6 +350,19 @@ class TeacherTest extends TestCase
         $this->assertSame(400, $status);
     }
 
+    public function testSetGradeLevelZeroMapsToK(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setGradeLevel', 'grade' => 0]
+        );
+        $this->assertSame(200, $status);
+        $st = sts_db()->query('SELECT word_source, grade_level FROM state WHERE id=1')->fetch();
+        $this->assertSame(0, (int)$st['grade_level']);
+        $this->assertSame('builtin:K', $st['word_source']);
+    }
+
     public function testPushWordSetsStateField(): void
     {
         [$status] = sts_invoke(
@@ -369,6 +382,16 @@ class TeacherTest extends TestCase
             'teacher.php', 'POST',
             ['key' => 'test-teacher-key-xyz'],
             ['action' => 'pushWord', 'word' => 'bad word!']
+        );
+        $this->assertSame(400, $status);
+    }
+
+    public function testPushWordRejectsEmpty(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'pushWord', 'word' => '']
         );
         $this->assertSame(400, $status);
     }
