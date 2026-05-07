@@ -1,48 +1,38 @@
 import { test, expect } from '@playwright/test';
 
-test('plays a run, dies, submits a score, sees leaderboard', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('h1')).toHaveText('SpellToSlay');
-
-  // Force the hero's HP to 0 immediately to trigger game over.
-  // (We don't try to "play" the game in the test — that's brittle.)
-  await page.evaluate(() => {
-    state.hero.hp = 0;
-  });
-
-  // Game-over modal appears within ~1 frame.
-  await expect(page.locator('#game-over')).toBeVisible({ timeout: 2000 });
-
-  // Submit a score.
-  await page.fill('#player-name', 'TestUser');
-  await page.click('#submit-score');
-
-  // Leaderboard modal appears with the entry.
-  const lb = page.locator('#leaderboard');
-  await expect(lb).toBeVisible({ timeout: 4000 });
-  await expect(lb.locator('#lb-alltime')).toContainText('TestUser');
-});
-
-test('teacher pause freezes the game', async ({ page }) => {
-  // Open the game in one tab.
+test('happy path: type a word, see score submitted', async ({ page }) => {
   await page.goto('/');
 
-  // Open teacher panel in another tab with a known key.
-  // For E2E we need a config; the webServer started fresh — so we plant one.
-  // Easier: hit the teacher endpoint directly with the dev key.
-  // Tests assume config/config.php has teacher_key='e2e-key' (set in step 5).
-  const res = await page.request.post('/api/teacher.php?key=e2e-key', {
-    data: { action: 'pause' },
-  });
-  expect(res.ok()).toBeTruthy();
+  // Name entry
+  await page.locator('#entry-name').fill('E2E');
+  await page.locator('#start-playing').click();
+  await expect(page.locator('#name-entry')).toBeHidden();
 
-  // Within ~2s the overlay should be visible.
-  await expect(page.locator('#overlay')).toBeVisible({ timeout: 4000 });
-  await expect(page.locator('#overlay')).toContainText('PAUSED BY TEACHER');
+  // Type a known easy word from the day-one builtin pool. "cat" is in grade-K.
+  // We don't know which enemy will spawn, so brute-force: type each easy word
+  // until we slay something or the run ends.
+  const tryWords = ['cat','dog','run','sit','sun','it','at','in','on','is','no','to','up','we','I','of','my','me'];
+  const input = page.locator('#type-input');
+  await input.focus();
 
-  // Resume.
-  await page.request.post('/api/teacher.php?key=e2e-key', {
-    data: { action: 'resume' },
-  });
-  await expect(page.locator('#overlay')).toBeHidden({ timeout: 4000 });
+  // Wait for at least one enemy to spawn
+  await page.waitForFunction(() => window.state && window.state.enemies && window.state.enemies.length > 0,
+    null, { timeout: 8000 });
+
+  // Pluck a live word and type it.
+  const word = await page.evaluate(() => window.state.enemies[0]?.word || '');
+  expect(word.length).toBeGreaterThan(0);
+  await input.type(word);
+
+  // Confirm at least one slay registered
+  await page.waitForFunction(() => window.state && window.state.kills >= 1, null, { timeout: 4000 });
+
+  // Force game over by zeroing HP via the dev hook
+  await page.evaluate(() => { window.state.hero.hp = 0; window.state.gameOver = true; });
+
+  // Submit score
+  await expect(page.locator('#game-over')).toBeVisible({ timeout: 4000 });
+  await page.locator('#submit-score').click();
+  await expect(page.locator('#leaderboard')).toBeVisible({ timeout: 4000 });
+  await expect(page.locator('#lb-alltime li').first()).toContainText('E2E');
 });

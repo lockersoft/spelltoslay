@@ -54,6 +54,8 @@ const state = {
   forceReloadHandled: false,
 };
 
+if (typeof window !== 'undefined') window.state = state;
+
 // ─── Boot ────────────────────────────────────────────
 const canvas = document.getElementById('arena');
 const ctx = canvas.getContext('2d');
