@@ -56,4 +56,16 @@ class LeaderboardTest extends TestCase
         $this->assertSame([], $json['allTime']);
         $this->assertSame([], $json['today']);
     }
+
+    public function testLeaderboardIncludesTypingFields(): void
+    {
+        sts_db()->exec("INSERT INTO scores (name, score, wave, duration, wpm, accuracy, words_slain, ip, submitted_at)
+                        VALUES ('A', 100, 1, 60, 35, 92, 18, '1.1.1.1', " . sts_now() . ")");
+        [$status, , $json] = sts_invoke('leaderboard.php', 'GET');
+        $this->assertSame(200, $status);
+        $entry = $json['allTime'][0];
+        $this->assertSame(35, $entry['wpm']);
+        $this->assertSame(92, $entry['accuracy']);
+        $this->assertSame(18, $entry['wordsSlain']);
+    }
 }

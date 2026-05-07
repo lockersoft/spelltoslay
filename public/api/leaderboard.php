@@ -15,12 +15,15 @@ $mapRow = function(array $r): array {
         'name'        => $r['name'],
         'score'       => (int)$r['score'],
         'wave'        => (int)$r['wave'],
+        'wpm'         => (int)$r['wpm'],
+        'accuracy'    => (int)$r['accuracy'],
+        'wordsSlain'  => (int)$r['words_slain'],
         'submittedAt' => gmdate('Y-m-d\TH:i:s\Z', (int)$r['submitted_at']),
     ];
 };
 
 $allTime = $db->query(
-    'SELECT name, score, wave, submitted_at
+    'SELECT name, score, wave, wpm, accuracy, words_slain, submitted_at
        FROM scores
    ORDER BY score DESC, submitted_at ASC
       LIMIT 20'
@@ -28,7 +31,7 @@ $allTime = $db->query(
 
 $cutoff = sts_now() - 86400;
 $today = $db->prepare(
-    'SELECT name, score, wave, submitted_at
+    'SELECT name, score, wave, wpm, accuracy, words_slain, submitted_at
        FROM scores
       WHERE submitted_at >= :cutoff
    ORDER BY score DESC, submitted_at ASC
