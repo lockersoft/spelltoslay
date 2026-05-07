@@ -308,6 +308,28 @@ function flashLockedRed() {
   e.flashUntil = state.time + 0.4;
 }
 
+function currentWpm() {
+  // Trim WPM log to last WPM_WINDOW_S seconds.
+  const cutoff = state.time - WPM_WINDOW_S;
+  while (state.wpmLog.length > 0 && state.wpmLog[0].ts < cutoff) state.wpmLog.shift();
+  if (state.wpmLog.length === 0) return 0;
+  const chars = state.wpmLog.reduce((s, e) => s + e.chars, 0);
+  const span  = Math.max(1, state.time - state.wpmLog[0].ts);
+  return Math.round((chars / 5) * (60 / span));
+}
+
+function currentAccuracy() {
+  if (state.keystrokes.total === 0) return 100;
+  return Math.round(100 * state.keystrokes.correct / state.keystrokes.total);
+}
+
+function elapsedHHMMSS() {
+  const t = Math.floor(state.time);
+  const m = String(Math.floor(t / 60)).padStart(1, '0');
+  const s = String(t % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
 typeInput.addEventListener('input', onType);
 typeInput.addEventListener('blur',  () => setTimeout(() => typeInput.focus(), 50));
 window.addEventListener('load',     () => typeInput.focus());
@@ -416,12 +438,50 @@ function render() {
     ctx.fillText(rest, e.x - w/2 + ctx.measureText(typed).width + ctx.measureText(rest).width/2, wY);
   }
 
-  // HUD placeholder text — replaced in Task 12
-  ctx.fillStyle = '#9fb0d8';
-  ctx.font = '11px ui-monospace, monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(`HP ${state.hero.hp}  W${state.spawn.wave}  Score ${state.score}`, 8, 18);
-  ctx.textAlign = 'center';
+  // ── HUD ──
+  function pill(text, color) {
+    ctx.font = '11px ui-monospace, monospace';
+    const padX = 6, padY = 4;
+    const w = ctx.measureText(text).width + padX * 2;
+    return { w, h: 18, draw(x, y) {
+      ctx.fillStyle = '#1a2238';
+      ctx.fillRect(x, y, w, 18);
+      ctx.strokeStyle = '#2a3858';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 17);
+      ctx.fillStyle = color || '#fff';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, x + padX, y + 9 + 4);
+      ctx.textAlign = 'center';
+    }};
+  }
+
+  // Top-left: HP, wave
+  let yL = 8;
+  const pHp   = pill(`HP ${state.hero.hp}`, '#ef476f');           pHp.draw(8, yL);   yL += 22;
+  const pWv   = pill(`W ${state.spawn.wave}`, '#fff');            pWv.draw(8, yL);
+
+  // Top-right: score, time
+  const pSc   = pill(`SCORE ${state.score}`, '#fff');
+  const pTm   = pill(`TIME ${elapsedHHMMSS()}`, '#fff');
+  pSc.draw(ARENA.w - pSc.w - 8, 8);
+  pTm.draw(ARENA.w - pTm.w - 8, 30);
+
+  // Bottom-right: WPM, accuracy, streak
+  const pWp   = pill(`WPM ${currentWpm()}`, '#06d6a0');
+  const pAc   = pill(`ACC ${currentAccuracy()}%`, '#5b8def');
+  const pSt   = pill(`STREAK ${state.streak}`, '#ffd166');
+  pWp.draw(ARENA.w - pWp.w - 8, ARENA.h - 70);
+  pAc.draw(ARENA.w - pAc.w - 8, ARENA.h - 48);
+  pSt.draw(ARENA.w - pSt.w - 8, ARENA.h - 26);
+
+  // Top-center: teacher message strip (only when message set)
+  if (state.messageBar) {
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = '#ffd166';
+    ctx.textAlign = 'center';
+    ctx.fillText(`📣 ${state.messageBar}`, ARENA.w / 2, 14);
+  }
 
   // Pause overlay
   if (state.paused || state.personalPaused) {
