@@ -35,6 +35,40 @@
         <button id="clear-board" class="danger">🗑 Clear leaderboard</button>
       </div>
 
+      <h3>Word pool</h3>
+      <div id="word-pool-section">
+        <div class="row">
+          <label style="display:flex;align-items:center;gap:8px">
+            Default grade:
+            <select id="grade-select">
+              <option value="0">K</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6" selected>6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+            </select>
+          </label>
+          <span id="active-source" class="active-source">Active: built-in (grade 6)</span>
+        </div>
+        <textarea id="word-list-textarea" rows="6"
+                  placeholder="Paste this week's spelling words here, one per line…"></textarea>
+        <div class="row">
+          <button id="use-list-btn">Use this list</button>
+          <button id="revert-list-btn" class="secondary">Revert to built-in</button>
+        </div>
+        <div class="row">
+          <label style="flex:1">
+            Spell this now:
+            <input id="push-word-input" maxlength="32" placeholder="single word">
+          </label>
+          <button id="push-word-btn">Push</button>
+        </div>
+      </div>
+
       <h3>Players online (<span id="roster-count">0</span>)</h3>
       <div id="roster" class="roster"></div>
 

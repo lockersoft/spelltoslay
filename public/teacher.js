@@ -369,3 +369,55 @@ function init() {
   refreshRoster();
   refreshContributors();
 }
+
+// ─── Word Pool controls ───
+const gradeSelect      = document.getElementById('grade-select');
+const wordListTextarea = document.getElementById('word-list-textarea');
+const useListBtn       = document.getElementById('use-list-btn');
+const revertListBtn    = document.getElementById('revert-list-btn');
+const pushWordInput    = document.getElementById('push-word-input');
+const pushWordBtn      = document.getElementById('push-word-btn');
+const activeSourceEl   = document.getElementById('active-source');
+
+useListBtn.addEventListener('click', async () => {
+  const text = wordListTextarea.value;
+  try {
+    await action({ action: 'setWordList', text });
+    wordListTextarea.value = '';
+  } catch (_) { /* showError already called */ }
+});
+
+revertListBtn.addEventListener('click', async () => {
+  try { await action({ action: 'clearWordList' }); }
+  catch (_) {}
+});
+
+gradeSelect.addEventListener('change', async () => {
+  try { await action({ action: 'setGradeLevel', grade: parseInt(gradeSelect.value, 10) }); }
+  catch (_) {}
+});
+
+pushWordBtn.addEventListener('click', async () => {
+  const w = pushWordInput.value.trim();
+  if (!w) return;
+  try {
+    await action({ action: 'pushWord', word: w });
+    pushWordInput.value = '';
+  } catch (_) {}
+});
+
+// Render active-source label whenever state refreshes.
+const _origRefreshState = refreshState;
+refreshState = async function () {
+  await _origRefreshState();
+  // Read state once more, just for the source/version display (refreshState
+  // doesn't expose it; tiny extra fetch is fine at 2s cadence).
+  try {
+    const s = await (await fetch('/api/state.php?cid=teacher-panel', {cache:'no-store'})).json();
+    activeSourceEl.textContent = `Active: ${s.wordSource === 'teacher' ? 'teacher list' : 'built-in (grade ' + s.wordSource.split(':')[1] + ')'}`;
+    if (s.wordSource && s.wordSource.startsWith('builtin:') && document.activeElement !== gradeSelect) {
+      const g = s.wordSource.split(':')[1];
+      gradeSelect.value = g === 'K' ? '0' : g;
+    }
+  } catch (_) {}
+};
