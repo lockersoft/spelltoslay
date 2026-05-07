@@ -598,9 +598,9 @@ async function pollServerState() {
     // catch it, but a client that just reloaded would otherwise loop until the
     // window expires. Skip the reload if we reloaded ourselves within ~12s.
     if (s.forceReload && s.version > state.serverVersion) {
-      const last = parseInt(localStorage.getItem('slay_last_reload_at') || '0', 10);
+      const last = parseInt(localStorage.getItem('sts_last_reload_at') || '0', 10);
       if (Date.now() - last >= 12000) {
-        localStorage.setItem('slay_last_reload_at', String(Date.now()));
+        localStorage.setItem('sts_last_reload_at', String(Date.now()));
         state.serverVersion = s.version;
         setTimeout(() => location.reload(), 600);
         return;

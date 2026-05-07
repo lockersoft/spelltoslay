@@ -4,7 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/../vendor/autoload.php';
 
 // Force test mode: temp SQLite DB, predictable teacher key.
-$tmpDb = tempnam(sys_get_temp_dir(), 'slay_test_') . '.sqlite';
+$tmpDb = tempnam(sys_get_temp_dir(), 'sts_test_') . '.sqlite';
 register_shutdown_function(fn() => @unlink($tmpDb));
 
 define('STS_DB_PATH', $tmpDb);
