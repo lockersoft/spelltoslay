@@ -4,6 +4,10 @@
 
 ### Added
 - `public/favicon.svg` — sword-on-dark icon, referenced from index.html and teacher.html.
+- E2E regression test for the name-entry focus-steal bug.
+
+### Fixed
+- Name-entry sign-in: typing your name now works. The gameplay typing input's blur-recapture (refocus 50ms after losing focus) was unconditional and stole focus from `#entry-name` mid-keystroke. Recapture now requires `state.running`, which is false while any modal is up.
 
 ### Changed
 - `deploy.php` repository URL switched from `github-spelltoslay:` (alias never set up server-side) to `github.com:lockersoft/spelltoslay.git`, which uses the server's existing github.com SSH config.

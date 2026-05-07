@@ -363,8 +363,10 @@ function elapsedHHMMSS() {
 }
 
 typeInput.addEventListener('input', onType);
-typeInput.addEventListener('blur',  () => setTimeout(() => typeInput.focus(), 50));
-window.addEventListener('load',     () => typeInput.focus());
+// Recapture focus only during gameplay. While a modal is up (name entry, game over),
+// state.running is false and the user is typing into a different input — don't steal.
+typeInput.addEventListener('blur',  () => setTimeout(() => { if (state.running) typeInput.focus(); }, 50));
+window.addEventListener('load',     () => { if (state.running) typeInput.focus(); });
 
 // ─── Polling ─────────────────────────────────────────
 async function pollServerState() {
