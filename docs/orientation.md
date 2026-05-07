@@ -1,6 +1,6 @@
-# TypeNSpell — Orientation for the Brainstorming Session
+# SpellToSlay — Orientation for the Brainstorming Session
 
-You (Claude) have just been opened in the `typenspell` project. The user
+You (Claude) have just been opened in the `spelltoslay` project. The user
 wants to brainstorm a typing & spelling game for their classroom (10–14
 year olds), built on the same architecture as their existing SLAY
 project.
@@ -43,7 +43,7 @@ Will be REPLACED for the typing game:
   (single-VPS-via-Deployer, polling, registry-based extension points,
   emoji as sprites). Most of those decisions still apply.
 - [docs/reference/slay/plan.md](reference/slay/plan.md) — the SLAY
-  implementation plan. Useful as a template for what a typenspell plan
+  implementation plan. Useful as a template for what a spelltoslay plan
   should look like once gameplay is decided.
 
 ## What the user wants from you (initially)
@@ -59,13 +59,13 @@ Will be REPLACED for the typing game:
    teacher panel or the polling infrastructure — those work. Focus on
    the gameplay specifics.
 
-3. **Write the spec to** `docs/superpowers/specs/<YYYY-MM-DD>-typenspell-design.md`.
+3. **Write the spec to** `docs/superpowers/specs/<YYYY-MM-DD>-spelltoslay-design.md`.
 
-4. **Then writing-plans** to produce `docs/superpowers/plans/<YYYY-MM-DD>-typenspell-v1.md`.
+4. **Then writing-plans** to produce `docs/superpowers/plans/<YYYY-MM-DD>-spelltoslay-v1.md`.
 
 5. **Then subagent-driven-development** to execute the plan. Reuse the
    server provisioning approach (DreamHost shared, ~/<domain> symlink to
-   `~/typenspell-app/public/`) — see `docs/reference/slay/plan.md` for
+   `~/spelltoslay-app/public/`) — see `docs/reference/slay/plan.md` for
    the "Server setup" section.
 
 ## Key design questions to bring up during brainstorm
@@ -95,7 +95,7 @@ Will be REPLACED for the typing game:
 - **Mobile:** SLAY now has touch controls. A typing game on phones is
   rough — accept on-screen keyboard, or scope mobile to "view only" /
   multiple-choice mode?
-- **Domain:** assume `typenspell.lockersoft.games`. Confirm.
+- **Domain:** assume `spelltoslay.lockersoft.games`. Confirm.
 
 ## Hand-off note
 

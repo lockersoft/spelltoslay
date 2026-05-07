@@ -2,25 +2,25 @@
 declare(strict_types=1);
 
 // Detect test mode (constants defined by tests/bootstrap.php).
-$dbPath = defined('SLAY_DB_PATH')
-    ? SLAY_DB_PATH
-    : __DIR__ . '/../../data/slay.db';
+$dbPath = defined('STS_DB_PATH')
+    ? STS_DB_PATH
+    : __DIR__ . '/../../data/spelltoslay.db';
 
 $config = ['teacher_key' => null];
 $configFile = __DIR__ . '/../../config/config.php';
-if (defined('SLAY_TEACHER_KEY')) {
-    $config['teacher_key'] = SLAY_TEACHER_KEY;
+if (defined('STS_TEACHER_KEY')) {
+    $config['teacher_key'] = STS_TEACHER_KEY;
 } elseif (file_exists($configFile)) {
     $config = array_merge($config, require $configFile);
 }
 
-$GLOBALS['__SLAY_DB_PATH']   = $dbPath;
-$GLOBALS['__SLAY_CONFIG']    = $config;
+$GLOBALS['__STS_DB_PATH']   = $dbPath;
+$GLOBALS['__STS_CONFIG']    = $config;
 
-function slay_db(): PDO {
+function sts_db(): PDO {
     static $pdo = null;
     if ($pdo === null) {
-        $pdo = new PDO('sqlite:' . $GLOBALS['__SLAY_DB_PATH']);
+        $pdo = new PDO('sqlite:' . $GLOBALS['__STS_DB_PATH']);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $pdo->exec('PRAGMA journal_mode=WAL');
@@ -29,34 +29,34 @@ function slay_db(): PDO {
     return $pdo;
 }
 
-function slay_config(): array {
-    return $GLOBALS['__SLAY_CONFIG'];
+function sts_config(): array {
+    return $GLOBALS['__STS_CONFIG'];
 }
 
 /**
  * Read the request body. Honors the PHPUnit-provided override.
  */
-function slay_input_raw(): string {
-    if (isset($GLOBALS['__SLAY_TEST_INPUT'])) {
-        return $GLOBALS['__SLAY_TEST_INPUT'];
+function sts_input_raw(): string {
+    if (isset($GLOBALS['__STS_TEST_INPUT'])) {
+        return $GLOBALS['__STS_TEST_INPUT'];
     }
     return file_get_contents('php://input') ?: '';
 }
 
-function slay_input_json(): array {
-    $raw = slay_input_raw();
+function sts_input_json(): array {
+    $raw = sts_input_raw();
     if ($raw === '') return [];
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : [];
 }
 
 /**
- * Emit a header. In test mode, captured to $GLOBALS['__SLAY_HEADERS'] instead
+ * Emit a header. In test mode, captured to $GLOBALS['__STS_HEADERS'] instead
  * of being sent — PHP's CLI SAPI silently drops header() but we want assertions.
  */
-function slay_header(string $line): void {
+function sts_header(string $line): void {
     if (PHP_SAPI === 'cli') {
-        $GLOBALS['__SLAY_HEADERS'][] = $line;
+        $GLOBALS['__STS_HEADERS'][] = $line;
         return;
     }
     header($line);
@@ -65,21 +65,21 @@ function slay_header(string $line): void {
 /**
  * Write a JSON response with a status code and exit (in non-test mode).
  */
-function slay_json(int $status, array|string $body): void {
+function sts_json(int $status, array|string $body): void {
     http_response_code($status);
-    slay_header('Content-Type: application/json; charset=utf-8');
+    sts_header('Content-Type: application/json; charset=utf-8');
     echo is_string($body) ? $body : json_encode($body);
     if (PHP_SAPI !== 'cli') {
         exit;
     }
 }
 
-function slay_now(): int { return time(); }
+function sts_now(): int { return time(); }
 
 /**
  * Shared profanity wordlist. Returns true if the name contains a banned word.
  */
-function slay_is_profane(string $name): bool {
+function sts_is_profane(string $name): bool {
     static $bannedWords = ['shit','fuck','bitch','cunt','asshole','damn','dick'];
     $lc = strtolower($name);
     foreach ($bannedWords as $w) {

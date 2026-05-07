@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Slay\Tests\Api;
+namespace Spelltoslay\Tests\Api;
 
 use PHPUnit\Framework\TestCase;
 
@@ -11,7 +11,7 @@ class BootstrapSmokeTest extends TestCase
     {
         require_once __DIR__ . '/../../public/api/_bootstrap.php';
 
-        $pdo = slay_db();
+        $pdo = sts_db();
         $this->assertInstanceOf(\PDO::class, $pdo);
 
         // The state row from init_db must exist.

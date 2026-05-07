@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
-$db  = slay_db();
-$now = slay_now();
+$db  = sts_db();
+$now = sts_now();
 
 $row = $db->query(
     'SELECT paused, message, force_reload, force_reload_set_at, version,
@@ -133,10 +133,10 @@ $etag = '"v' . (int)$row['version'] . '"';
 $ifNone = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
 if ($ifNone !== '' && $ifNone === $etag) {
     http_response_code(304);
-    slay_header('ETag: ' . $etag);
+    sts_header('ETag: ' . $etag);
     if (PHP_SAPI !== 'cli') exit;
     return;
 }
 
-slay_header('ETag: ' . $etag);
-slay_json(200, $payload);
+sts_header('ETag: ' . $etag);
+sts_json(200, $payload);

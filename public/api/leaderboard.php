@@ -4,11 +4,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/_bootstrap.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-    slay_json(405, ['error' => 'method not allowed']);
+    sts_json(405, ['error' => 'method not allowed']);
     return;
 }
 
-$db = slay_db();
+$db = sts_db();
 
 $mapRow = function(array $r): array {
     return [
@@ -26,7 +26,7 @@ $allTime = $db->query(
       LIMIT 20'
 )->fetchAll();
 
-$cutoff = slay_now() - 86400;
+$cutoff = sts_now() - 86400;
 $today = $db->prepare(
     'SELECT name, score, wave, submitted_at
        FROM scores
@@ -36,7 +36,7 @@ $today = $db->prepare(
 );
 $today->execute([':cutoff' => $cutoff]);
 
-slay_json(200, [
+sts_json(200, [
     'allTime' => array_map($mapRow, $allTime),
     'today'   => array_map($mapRow, $today->fetchAll()),
 ]);

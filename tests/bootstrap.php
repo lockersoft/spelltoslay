@@ -7,13 +7,13 @@ require __DIR__ . '/../vendor/autoload.php';
 $tmpDb = tempnam(sys_get_temp_dir(), 'slay_test_') . '.sqlite';
 register_shutdown_function(fn() => @unlink($tmpDb));
 
-define('SLAY_DB_PATH', $tmpDb);
-define('SLAY_TEACHER_KEY', 'test-teacher-key-xyz');
+define('STS_DB_PATH', $tmpDb);
+define('STS_TEACHER_KEY', 'test-teacher-key-xyz');
 
 // Initialize schema by including the init script.
 require __DIR__ . '/../scripts/init_db.php';
 
-// Make API helpers (slay_db, slay_json, etc.) available globally for test setUp/tearDown.
+// Make API helpers (sts_db, sts_json, etc.) available globally for test setUp/tearDown.
 require_once __DIR__ . '/../public/api/_bootstrap.php';
 
 /**
@@ -22,7 +22,7 @@ require_once __DIR__ . '/../public/api/_bootstrap.php';
  * Sets $_SERVER, $_GET, $_POST, php://input as the endpoint expects, then
  * captures output. PHPUnit running this is single-threaded so globals are safe.
  */
-function slay_invoke(string $relPath, string $method = 'GET', array $query = [], $body = null, array $headers = []): array {
+function sts_invoke(string $relPath, string $method = 'GET', array $query = [], $body = null, array $headers = []): array {
     $_SERVER = array_merge($_SERVER, [
         'REQUEST_METHOD' => $method,
         'REMOTE_ADDR'    => '127.0.0.1',
@@ -36,18 +36,18 @@ function slay_invoke(string $relPath, string $method = 'GET', array $query = [],
 
     // Stub php://input for JSON-body endpoints.
     if (is_string($body)) {
-        $GLOBALS['__SLAY_TEST_INPUT'] = $body;
+        $GLOBALS['__STS_TEST_INPUT'] = $body;
     } elseif (is_array($body) && $method !== 'GET') {
-        $GLOBALS['__SLAY_TEST_INPUT'] = json_encode($body);
+        $GLOBALS['__STS_TEST_INPUT'] = json_encode($body);
     } else {
-        $GLOBALS['__SLAY_TEST_INPUT'] = '';
+        $GLOBALS['__STS_TEST_INPUT'] = '';
     }
 
     http_response_code(200);
     ob_start();
     // header() can't be intercepted cleanly under PHPUnit/CLI without runkit,
-    // so endpoints in test mode also append headers to a $GLOBALS['__SLAY_HEADERS'] array.
-    $GLOBALS['__SLAY_HEADERS'] = [];
+    // so endpoints in test mode also append headers to a $GLOBALS['__STS_HEADERS'] array.
+    $GLOBALS['__STS_HEADERS'] = [];
     try {
         require __DIR__ . '/../public/api/' . $relPath;
     } catch (\Throwable $e) {
@@ -58,5 +58,5 @@ function slay_invoke(string $relPath, string $method = 'GET', array $query = [],
     $status = http_response_code() ?: 200;
 
     $json = json_decode($out, true);
-    return [$status, $GLOBALS['__SLAY_HEADERS'], $json, $out];
+    return [$status, $GLOBALS['__STS_HEADERS'], $json, $out];
 }

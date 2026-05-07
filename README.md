@@ -1,4 +1,4 @@
-# TypeNSpell
+# SpellToSlay
 
 Browser-based typing and spelling game for in-class AI vibe coding with
 10–14 year olds. Each student suggests a feature; the teacher implements
@@ -23,10 +23,10 @@ mechanics) replaces SLAY's arena combat.
    implementation plan in `docs/superpowers/plans/`, then
    subagent-driven-development executes it.
 
-3. **Deploy target:** `typenspell.lockersoft.games` (or whichever domain
+3. **Deploy target:** `spelltoslay.lockersoft.games` (or whichever domain
    the user chooses during setup). Same DreamHost shared-hosting pattern
-   as SLAY: clone to `~/typenspell-app/`, symlink `~/<domain>/` to
-   `~/typenspell-app/public/`, deploy via `git fetch && reset --hard`
+   as SLAY: clone to `~/spelltoslay-app/`, symlink `~/<domain>/` to
+   `~/spelltoslay-app/public/`, deploy via `git fetch && reset --hard`
    plus `composer install --no-dev`.
 
 ## What's already wired up (inherited from SLAY)
@@ -45,11 +45,11 @@ mechanics) replaces SLAY's arena combat.
 - Tests: 68 PHPUnit tests covering all API endpoints, 1 Playwright
   happy-path E2E.
 - Deployer recipe in `deploy.php` (configured for slay.lockersoft.games
-  — needs hostname update for typenspell).
+  — needs hostname update for spelltoslay).
 - VERSION display: `vSEMVER.COUNT` (semver from `VERSION_BASE`, count
   from `git rev-list --count HEAD` written by deploy).
 
-## What needs to change for typenspell
+## What needs to change for spelltoslay
 
 - **Gameplay:** `public/game.js` is currently the SLAY arena combat
   engine. Replace with a typing/spelling loop. The brainstorm session
@@ -63,7 +63,7 @@ mechanics) replaces SLAY's arena combat.
 - **Roster live stats:** instead of score/wave/HP, the teacher should
   see typing-specific signals (current word, WPM, accuracy, streak).
 - **Domain:** update `deploy.php`, README, `slay.lockersoft.games` →
-  `typenspell.lockersoft.games`.
+  `spelltoslay.lockersoft.games`.
 - **Tests:** rename SLAY-specific tests, add typing-specific tests.
 
 ## Local development

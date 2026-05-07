@@ -4,22 +4,22 @@ declare(strict_types=1);
 require_once __DIR__ . '/_bootstrap.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-    slay_json(405, ['error' => 'method not allowed']);
+    sts_json(405, ['error' => 'method not allowed']);
     return;
 }
 
-$config = slay_config();
+$config = sts_config();
 $expected = $config['teacher_key'] ?? null;
 $provided = $_GET['key'] ?? '';
 if (!$expected || !is_string($provided) || !hash_equals($expected, $provided)) {
-    slay_json(403, ['error' => 'forbidden']);
+    sts_json(403, ['error' => 'forbidden']);
     return;
 }
 
-$body   = slay_input_json();
+$body   = sts_input_json();
 $action = $body['action'] ?? '';
 
-$db = slay_db();
+$db = sts_db();
 
 switch ($action) {
     case 'pause':
@@ -41,12 +41,12 @@ switch ($action) {
         $stmt = $db->prepare(
             'UPDATE state SET force_reload=1, force_reload_set_at=:t, version=version+1 WHERE id=1'
         );
-        $stmt->execute([':t' => slay_now()]);
+        $stmt->execute([':t' => sts_now()]);
         break;
 
     case 'clearLeaderboard':
         if (empty($body['confirm'])) {
-            slay_json(400, ['error' => 'confirm required']);
+            sts_json(400, ['error' => 'confirm required']);
             return;
         }
         $db->exec('DELETE FROM scores');
@@ -56,7 +56,7 @@ switch ($action) {
     case 'messageStudent':
         $studentCid = (string)($body['cid'] ?? '');
         if ($studentCid === '' || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $studentCid)) {
-            slay_json(400, ['error' => 'cid required']);
+            sts_json(400, ['error' => 'cid required']);
             return;
         }
         $text = (string)($body['text'] ?? '');
@@ -69,7 +69,7 @@ switch ($action) {
     case 'pauseStudent':
         $studentCid = (string)($body['cid'] ?? '');
         if ($studentCid === '' || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $studentCid)) {
-            slay_json(400, ['error' => 'cid required']);
+            sts_json(400, ['error' => 'cid required']);
             return;
         }
         $stmt = $db->prepare('UPDATE presence SET personal_paused=1 WHERE client_id=:cid');
@@ -80,7 +80,7 @@ switch ($action) {
     case 'resumeStudent':
         $studentCid = (string)($body['cid'] ?? '');
         if ($studentCid === '' || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $studentCid)) {
-            slay_json(400, ['error' => 'cid required']);
+            sts_json(400, ['error' => 'cid required']);
             return;
         }
         $stmt = $db->prepare('UPDATE presence SET personal_paused=0 WHERE client_id=:cid');
@@ -91,16 +91,16 @@ switch ($action) {
     case 'renameStudent':
         $studentCid = (string)($body['cid'] ?? '');
         if ($studentCid === '' || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $studentCid)) {
-            slay_json(400, ['error' => 'cid required']);
+            sts_json(400, ['error' => 'cid required']);
             return;
         }
         $newName = trim((string)($body['name'] ?? ''));
         if ($newName === '' || mb_strlen($newName) > 16 || !preg_match('/^[A-Za-z0-9 ]{1,16}$/', $newName)) {
-            slay_json(400, ['error' => 'name must be 1–16 alphanumeric characters (with spaces)']);
+            sts_json(400, ['error' => 'name must be 1–16 alphanumeric characters (with spaces)']);
             return;
         }
-        if (slay_is_profane($newName)) {
-            slay_json(400, ['error' => 'name not allowed']);
+        if (sts_is_profane($newName)) {
+            sts_json(400, ['error' => 'name not allowed']);
             return;
         }
         $stmt = $db->prepare('UPDATE presence SET name = :name WHERE client_id = :cid');
@@ -111,19 +111,19 @@ switch ($action) {
     case 'startPoll':
         $question = trim((string)($body['question'] ?? ''));
         if ($question === '' || mb_strlen($question) > 200) {
-            slay_json(400, ['error' => 'question must be 1–200 characters']);
+            sts_json(400, ['error' => 'question must be 1–200 characters']);
             return;
         }
         $options = $body['options'] ?? [];
         if (!is_array($options) || count($options) < 2 || count($options) > 6) {
-            slay_json(400, ['error' => 'options must be an array of 2–6 items']);
+            sts_json(400, ['error' => 'options must be an array of 2–6 items']);
             return;
         }
         $cleanOptions = [];
         foreach ($options as $opt) {
             $optStr = trim((string)$opt);
             if ($optStr === '' || mb_strlen($optStr) > 40) {
-                slay_json(400, ['error' => 'each option must be 1–40 characters']);
+                sts_json(400, ['error' => 'each option must be 1–40 characters']);
                 return;
             }
             $cleanOptions[] = $optStr;
@@ -139,8 +139,8 @@ switch ($action) {
         break;
 
     default:
-        slay_json(400, ['error' => 'unknown action']);
+        sts_json(400, ['error' => 'unknown action']);
         return;
 }
 
-slay_json(200, ['ok' => true]);
+sts_json(200, ['ok' => true]);

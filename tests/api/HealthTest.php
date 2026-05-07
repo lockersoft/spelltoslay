@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Slay\Tests\Api;
+namespace Spelltoslay\Tests\Api;
 
 use PHPUnit\Framework\TestCase;
 
@@ -9,7 +9,7 @@ class HealthTest extends TestCase
 {
     public function test_returns_ok_with_db_status(): void
     {
-        [$status, $headers, $json] = slay_invoke('health.php');
+        [$status, $headers, $json] = sts_invoke('health.php');
 
         $this->assertSame(200, $status);
         $this->assertTrue($json['ok']);

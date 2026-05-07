@@ -3,25 +3,25 @@ namespace Deployer;
 
 require 'recipe/common.php';
 
-// SLAY runs on DreamHost shared hosting, not a VPS, so the standard "release
+// SpellToSlay runs on DreamHost shared hosting, not a VPS, so the standard "release
 // directory + symlink swap" Deployer pattern doesn't apply — there's no
 // /var/www, no sudo, no separate deploy user. Deploy is just:
 //   git fetch && git reset --hard origin/main → composer install → init_db → health check.
 //
-// The web doc root /home/lockersoft/slay.lockersoft.games is a symlink to
-// /home/lockersoft/slay-app/public (set up once during initial provisioning;
-// see README "Server setup"). Updating slay-app/ in place is an
+// The web doc root /home/lockersoft/spelltoslay.lockersoft.games is a symlink to
+// /home/lockersoft/spelltoslay-app/public (set up once during initial provisioning;
+// see README "Server setup"). Updating spelltoslay-app/ in place is an
 // atomic-enough deploy for a classroom and lets us avoid Apache config
 // changes that would break DreamHost's per-site SSL/cert management.
 
-set('application',  'slay');
-set('repository',   'github-slay:lockersoft/slay.git'); // SSH alias on the server
+set('application',  'spelltoslay');
+set('repository',   'github-spelltoslay:lockersoft/spelltoslay.git'); // SSH alias on the server
 set('default_stage', 'production');
 
 host('production')
-    ->setHostname('slay.lockersoft.games')
+    ->setHostname('spelltoslay.lockersoft.games')
     ->set('remote_user', 'lockersoft')
-    ->set('deploy_path', '/home/lockersoft/slay-app');
+    ->set('deploy_path', '/home/lockersoft/spelltoslay-app');
 
 task('deploy:pull', function () {
     run('cd {{deploy_path}} && git fetch origin && git reset --hard origin/main');
@@ -44,14 +44,14 @@ task('deploy:init_db', function () {
 });
 
 task('deploy:health_check', function () {
-    $body = runLocally('curl -fsS https://slay.lockersoft.games/api/health.php');
+    $body = runLocally('curl -fsS https://spelltoslay.lockersoft.games/api/health.php');
     if (!str_contains($body, '"ok":true')) {
         throw new \RuntimeException("Health check failed: $body");
     }
     writeln("<info>health: $body</info>");
 });
 
-desc('Deploy SLAY to slay.lockersoft.games');
+desc('Deploy SpellToSlay to spelltoslay.lockersoft.games');
 task('deploy', [
     'deploy:pull',
     'deploy:vendors',

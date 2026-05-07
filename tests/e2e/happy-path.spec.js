@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('plays a run, dies, submits a score, sees leaderboard', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('h1')).toHaveText('SLAY');
+  await expect(page.locator('h1')).toHaveText('SpellToSlay');
 
   // Force the hero's HP to 0 immediately to trigger game over.
   // (We don't try to "play" the game in the test — that's brittle.)

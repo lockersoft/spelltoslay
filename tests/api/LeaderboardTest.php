@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Slay\Tests\Api;
+namespace Spelltoslay\Tests\Api;
 
 use PHPUnit\Framework\TestCase;
 
@@ -9,12 +9,12 @@ class LeaderboardTest extends TestCase
 {
     protected function setUp(): void
     {
-        slay_db()->exec('DELETE FROM scores');
+        sts_db()->exec('DELETE FROM scores');
     }
 
     private function insert(string $name, int $score, int $secondsAgo): void
     {
-        $stmt = slay_db()->prepare(
+        $stmt = sts_db()->prepare(
             'INSERT INTO scores (name, score, wave, duration, ip, submitted_at)
              VALUES (:n, :s, 1, 60, "127.0.0.1", :t)'
         );
@@ -31,7 +31,7 @@ class LeaderboardTest extends TestCase
             $this->insert("New$i", 500 + $i, 60); // 1 minute ago
         }
 
-        [$status, , $json] = slay_invoke('leaderboard.php');
+        [$status, , $json] = sts_invoke('leaderboard.php');
         $this->assertSame(200, $status);
         $this->assertCount(20, $json['allTime']);
         $this->assertCount(5,  $json['today']);
@@ -51,7 +51,7 @@ class LeaderboardTest extends TestCase
 
     public function test_empty_leaderboard(): void
     {
-        [$status, , $json] = slay_invoke('leaderboard.php');
+        [$status, , $json] = sts_invoke('leaderboard.php');
         $this->assertSame(200, $status);
         $this->assertSame([], $json['allTime']);
         $this->assertSame([], $json['today']);

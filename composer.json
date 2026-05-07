@@ -1,6 +1,6 @@
 {
-  "name": "lockersoft/slay",
-  "description": "SLAY — browser arena game for in-class AI vibe coding.",
+  "name": "lockersoft/spelltoslay",
+  "description": "SpellToSlay — browser typing/spelling game for in-class AI vibe coding.",
   "type": "project",
   "license": "proprietary",
   "require": {
@@ -11,6 +11,6 @@
     "phpunit/phpunit": "^10.5"
   },
   "autoload-dev": {
-    "psr-4": { "Slay\\Tests\\": "tests/" }
+    "psr-4": { "Spelltoslay\\Tests\\": "tests/" }
   }
 }

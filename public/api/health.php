@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_bootstrap.php';
 
 try {
-    $row = slay_db()->query('SELECT 1 AS ok')->fetch();
+    $row = sts_db()->query('SELECT 1 AS ok')->fetch();
     $dbOk = ($row['ok'] ?? null) == 1;
 } catch (\Throwable $e) {
     $dbOk = false;
@@ -23,7 +23,7 @@ $count    = file_exists($verFile) ? trim(file_get_contents($verFile)) : 'dev';
 
 $version  = "$base.$count";
 
-slay_json(200, [
+sts_json(200, [
     'ok'      => $dbOk,
     'db'      => $dbOk ? 'ok' : 'error',
     'version' => $version,

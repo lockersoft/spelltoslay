@@ -1,8 +1,8 @@
 'use strict';
 
 const url = new URL(location.href);
-let key = url.searchParams.get('key') || sessionStorage.getItem('slay_teacher_key') || '';
-if (key) sessionStorage.setItem('slay_teacher_key', key);
+let key = url.searchParams.get('key') || sessionStorage.getItem('sts_teacher_key') || '';
+if (key) sessionStorage.setItem('sts_teacher_key', key);
 
 const gate = document.getElementById('auth-gate');
 const panel = document.getElementById('control-panel');

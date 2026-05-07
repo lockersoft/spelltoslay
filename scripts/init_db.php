@@ -4,14 +4,14 @@ declare(strict_types=1);
 /**
  * Idempotent SQLite schema initializer.
  *
- * Reads SLAY_DB_PATH if defined (test bootstrap sets this), otherwise
+ * Reads STS_DB_PATH if defined (test bootstrap sets this), otherwise
  * falls back to the production location. Creates tables IF NOT EXISTS,
  * so it's safe to run on every deploy.
  */
 
-$dbPath = defined('SLAY_DB_PATH')
-    ? SLAY_DB_PATH
-    : __DIR__ . '/../data/slay.db';
+$dbPath = defined('STS_DB_PATH')
+    ? STS_DB_PATH
+    : __DIR__ . '/../data/spelltoslay.db';
 
 @mkdir(dirname($dbPath), 0775, recursive: true);
 
@@ -106,6 +106,6 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS poll_responses (
 )");
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_poll_responses_poll ON poll_responses(poll_id)");
 
-if (PHP_SAPI === 'cli' && !defined('SLAY_DB_PATH')) {
-    echo "Initialized SLAY DB at $dbPath\n";
+if (PHP_SAPI === 'cli' && !defined('STS_DB_PATH')) {
+    echo "Initialized SpellToSlay DB at $dbPath\n";
 }

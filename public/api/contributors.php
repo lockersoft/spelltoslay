@@ -4,21 +4,21 @@ declare(strict_types=1);
 require_once __DIR__ . '/_bootstrap.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-    slay_json(405, ['error' => 'method not allowed']);
+    sts_json(405, ['error' => 'method not allowed']);
     return;
 }
 
-$config   = slay_config();
+$config   = sts_config();
 $expected = $config['teacher_key'] ?? null;
 $provided = $_GET['key'] ?? '';
 if (!$expected || !is_string($provided) || !hash_equals($expected, $provided)) {
-    slay_json(403, ['error' => 'forbidden']);
+    sts_json(403, ['error' => 'forbidden']);
     return;
 }
 
 // Allow test to override the changelog path via a constant.
-$changelogPath = defined('SLAY_CHANGELOG_PATH')
-    ? SLAY_CHANGELOG_PATH
+$changelogPath = defined('STS_CHANGELOG_PATH')
+    ? STS_CHANGELOG_PATH
     : __DIR__ . '/../../CHANGELOG.md';
 
 $contributors = [];
@@ -62,4 +62,4 @@ if (file_exists($changelogPath)) {
     }
 }
 
-slay_json(200, ['contributors' => $contributors]);
+sts_json(200, ['contributors' => $contributors]);

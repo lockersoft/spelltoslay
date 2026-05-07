@@ -3,20 +3,20 @@ declare(strict_types=1);
 require_once __DIR__ . '/_bootstrap.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-    slay_json(405, ['error' => 'method not allowed']);
+    sts_json(405, ['error' => 'method not allowed']);
     return;
 }
 
-$config = slay_config();
+$config = sts_config();
 $expected = $config['teacher_key'] ?? null;
 $provided = $_GET['key'] ?? '';
 if (!$expected || !is_string($provided) || !hash_equals($expected, $provided)) {
-    slay_json(403, ['error' => 'forbidden']);
+    sts_json(403, ['error' => 'forbidden']);
     return;
 }
 
-$db  = slay_db();
-$now = slay_now();
+$db  = sts_db();
+$now = sts_now();
 
 // Get current poll_id so we can look up each player's vote.
 $stateRow = $db->query('SELECT poll_id FROM state WHERE id=1')->fetch();
@@ -40,7 +40,7 @@ if ($currentPollId > 0) {
     }
 }
 
-slay_json(200, ['players' => array_map(fn($r) => [
+sts_json(200, ['players' => array_map(fn($r) => [
     'cid'             => $r['client_id'],
     'name'            => (string)($r['name'] ?? ''),
     'personalMessage' => (string)($r['personal_message'] ?? ''),

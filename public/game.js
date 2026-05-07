@@ -91,14 +91,14 @@ ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
 
 state.clientId = (() => {
-  const stored = localStorage.getItem('slay_cid');
+  const stored = localStorage.getItem('sts_cid');
   if (stored) return stored;
   const cid = crypto.randomUUID();
-  localStorage.setItem('slay_cid', cid);
+  localStorage.setItem('sts_cid', cid);
   return cid;
 })();
 
-state.playerName = localStorage.getItem('slay_player_name') || '';
+state.playerName = localStorage.getItem('sts_player_name') || '';
 
 // Feature 2: track tab visibility.
 state.tabVisible = document.visibilityState !== 'hidden';
@@ -145,7 +145,7 @@ function submitName() {
   }
   errEl.classList.add('hidden');
   state.playerName = name;
-  localStorage.setItem('slay_player_name', name);
+  localStorage.setItem('sts_player_name', name);
   document.getElementById('name-entry').classList.add('hidden');
   startRun();
 }
@@ -318,12 +318,12 @@ document.getElementById('change-name').addEventListener('click', async e => {
     const res = await r.json();
     if (!r.ok) { alert(res.error || 'Rename failed'); return; }
     state.playerName = res.name;
-    localStorage.setItem('slay_player_name', res.name);
+    localStorage.setItem('sts_player_name', res.name);
     document.getElementById('game-over-name').textContent = res.name;
   } catch (_) {
     // Fallback: update locally.
     state.playerName = trimmed;
-    localStorage.setItem('slay_player_name', trimmed);
+    localStorage.setItem('sts_player_name', trimmed);
     document.getElementById('game-over-name').textContent = trimmed;
   }
 });
@@ -555,7 +555,7 @@ async function pollServerState() {
     if (s.name && s.name !== '' && s.name !== state.playerName) {
       const oldName = state.playerName;
       state.playerName = s.name;
-      localStorage.setItem('slay_player_name', s.name);
+      localStorage.setItem('sts_player_name', s.name);
       // Show transient banner.
       state.nameChangedBanner = { text: `Name changed by teacher → ${s.name}`, shownAtMs: Date.now() };
     }
