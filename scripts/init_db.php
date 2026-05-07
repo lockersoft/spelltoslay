@@ -84,6 +84,46 @@ if (!in_array('is_visible', $existing, true)) {
     $pdo->exec("ALTER TABLE presence ADD COLUMN is_visible INTEGER NOT NULL DEFAULT 1");
 }
 
+// ── SpellToSlay v1: scores table — add typing-specific columns ─────────────
+$scoresCols = $pdo->query("PRAGMA table_info(scores)")->fetchAll(PDO::FETCH_ASSOC);
+$existingScoresCols = array_column($scoresCols, 'name');
+if (!in_array('wpm', $existingScoresCols, true)) {
+    $pdo->exec("ALTER TABLE scores ADD COLUMN wpm INTEGER NOT NULL DEFAULT 0");
+}
+if (!in_array('accuracy', $existingScoresCols, true)) {
+    $pdo->exec("ALTER TABLE scores ADD COLUMN accuracy INTEGER NOT NULL DEFAULT 0");
+}
+if (!in_array('words_slain', $existingScoresCols, true)) {
+    $pdo->exec("ALTER TABLE scores ADD COLUMN words_slain INTEGER NOT NULL DEFAULT 0");
+}
+
+// ── SpellToSlay v1: state table — word-pool fields ────────────────────────
+$stateColsV2 = $pdo->query("PRAGMA table_info(state)")->fetchAll(PDO::FETCH_ASSOC);
+$existingStateColsV2 = array_column($stateColsV2, 'name');
+if (!in_array('word_source', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN word_source TEXT NOT NULL DEFAULT 'builtin:6'");
+}
+if (!in_array('grade_level', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN grade_level INTEGER NOT NULL DEFAULT 6");
+}
+if (!in_array('word_list_version', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN word_list_version INTEGER NOT NULL DEFAULT 0");
+}
+if (!in_array('push_word', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN push_word TEXT NOT NULL DEFAULT ''");
+}
+
+// ── SpellToSlay v1: teacher-uploaded word list ────────────────────────────
+$pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS teacher_word_list (
+    id        INTEGER PRIMARY KEY,
+    word      TEXT NOT NULL,
+    position  INTEGER NOT NULL,
+    set_at    INTEGER NOT NULL
+)
+SQL);
+$pdo->exec('CREATE INDEX IF NOT EXISTS idx_teacher_word_list_pos ON teacher_word_list(position)');
+
 // Feature 12 — Live polls: columns on state singleton.
 $stateCols = $pdo->query("PRAGMA table_info(state)")->fetchAll(PDO::FETCH_ASSOC);
 $existing_state = array_column($stateCols, 'name');

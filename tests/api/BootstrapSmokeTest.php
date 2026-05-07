@@ -19,4 +19,42 @@ class BootstrapSmokeTest extends TestCase
         $this->assertNotFalse($row);
         $this->assertSame(0, (int)$row['paused']);
     }
+
+    public function testScoresTableHasNewColumns(): void
+    {
+        $cols = array_column(
+            sts_db()->query("PRAGMA table_info(scores)")->fetchAll(),
+            'name'
+        );
+        $this->assertContains('wpm',         $cols);
+        $this->assertContains('accuracy',    $cols);
+        $this->assertContains('words_slain', $cols);
+    }
+
+    public function testStateTableHasNewColumns(): void
+    {
+        $cols = array_column(
+            sts_db()->query("PRAGMA table_info(state)")->fetchAll(),
+            'name'
+        );
+        $this->assertContains('word_source',        $cols);
+        $this->assertContains('grade_level',        $cols);
+        $this->assertContains('word_list_version',  $cols);
+        $this->assertContains('push_word',          $cols);
+    }
+
+    public function testTeacherWordListTableExists(): void
+    {
+        $row = sts_db()->query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='teacher_word_list'"
+        )->fetch();
+        $this->assertNotFalse($row);
+        $cols = array_column(
+            sts_db()->query("PRAGMA table_info(teacher_word_list)")->fetchAll(),
+            'name'
+        );
+        $this->assertContains('word',     $cols);
+        $this->assertContains('position', $cols);
+        $this->assertContains('set_at',   $cols);
+    }
 }
