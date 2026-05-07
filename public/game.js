@@ -405,15 +405,91 @@ async function pollServerState() {
     state.pushWordPending = s.pushWord;
   }
 
-  // Polls — same shape as SLAY; just store and let the overlay render.
-  if (s.pollQuestion) {
-    state.pollState = { pollId: s.pollId, question: s.pollQuestion, options: s.pollOptions || [], myAnswer: s.pollMyAnswer ?? null };
-  } else {
-    state.pollState = null;
-  }
+  // Polls — capture state AND render the overlay (ported from SLAY).
+  updatePollOverlay(s);
 }
 setInterval(pollServerState, 2000);
 document.addEventListener('visibilitychange', () => { state.tabVisible = !document.hidden; });
+
+// ─── Poll overlay ────────────────────────────────────
+// The overlay sits on top of the canvas, so we auto-dismiss it 15 seconds
+// after the player has voted — long enough to confirm the choice, short
+// enough not to obscure gameplay.
+function updatePollOverlay(s) {
+  const pollEl = document.getElementById('poll-overlay');
+  if (!pollEl) return;
+
+  if (!s.pollQuestion) {
+    pollEl.classList.add('hidden');
+    state.pollState = null;
+    state.pollAnsweredAt = 0;
+    return;
+  }
+
+  const options = s.pollOptions || [];
+  const myAnswer = s.pollMyAnswer;
+  const pollId   = s.pollId;
+
+  // Reset the dismissal timer if this is a new poll.
+  if (!state.pollState || state.pollState.pollId !== pollId) {
+    state.pollAnsweredAt = 0;
+  }
+
+  state.pollState = { pollId, question: s.pollQuestion, options, myAnswer: myAnswer ?? null };
+
+  // If we've answered (this session OR a previous session for the same poll),
+  // start the dismissal clock if it's not already running.
+  if (myAnswer !== null && myAnswer !== undefined && !state.pollAnsweredAt) {
+    state.pollAnsweredAt = Date.now();
+  }
+  if (state.pollAnsweredAt && Date.now() - state.pollAnsweredAt > POLL_DISMISS_AFTER_MS) {
+    pollEl.classList.add('hidden');
+    return;
+  }
+
+  pollEl.classList.remove('hidden');
+  document.getElementById('poll-question').textContent = s.pollQuestion;
+  const btnsEl = document.getElementById('poll-options');
+  btnsEl.innerHTML = '';
+
+  if (myAnswer !== null && myAnswer !== undefined) {
+    // Already answered — show confirmed state with countdown to dismiss.
+    const remaining = Math.max(0, Math.ceil(
+      (POLL_DISMISS_AFTER_MS - (Date.now() - state.pollAnsweredAt)) / 1000
+    ));
+    const thanks = document.createElement('p');
+    thanks.textContent = `✓ You picked: ${options[myAnswer] || myAnswer}`;
+    thanks.style.fontWeight = '700';
+    thanks.style.margin = '0';
+    const fade = document.createElement('p');
+    fade.textContent = remaining > 0 ? `(closing in ${remaining}s)` : '';
+    fade.style.cssText = 'margin: 4px 0 0; font-size: 12px; color: #6e7681;';
+    btnsEl.appendChild(thanks);
+    btnsEl.appendChild(fade);
+  } else {
+    // Not yet answered — show option buttons.
+    options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.textContent = opt;
+      btn.addEventListener('click', async () => {
+        try {
+          await fetch('/api/poll-vote.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cid: state.clientId, pollId, optionIndex: i }),
+          });
+          if (state.pollState) state.pollState.myAnswer = i;
+          state.pollAnsweredAt = Date.now();
+          // Re-render in answered state immediately (don't wait for next poll).
+          updatePollOverlay({ ...s, pollMyAnswer: i });
+          // Schedule a hide so the user doesn't have to wait for a poll cycle.
+          setTimeout(() => pollEl.classList.add('hidden'), POLL_DISMISS_AFTER_MS);
+        } catch (_) {}
+      });
+      btnsEl.appendChild(btn);
+    });
+  }
+}
 
 // ─── Render ──────────────────────────────────────────
 function render() {
