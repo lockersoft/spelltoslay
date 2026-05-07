@@ -138,6 +138,82 @@ switch ($action) {
         $db->exec("UPDATE state SET poll_question='', poll_options='[]', version=version+1 WHERE id=1");
         break;
 
+    case 'setWordList': {
+        $text = (string)($body['text'] ?? '');
+        $words = [];
+        foreach (preg_split('/\R/', $text) as $line) {
+            $w = strtolower(trim($line));
+            if ($w === '') continue;
+            if (!preg_match('/^[a-z]{1,32}$/', $w)) continue; // skip non-alpha lines silently
+            $words[] = $w;
+            if (count($words) >= 500) break; // hard cap
+        }
+        if (count($words) === 0) {
+            sts_json(400, ['error' => 'list contains no usable words (a-z, max 32 chars each)']);
+            return;
+        }
+        $db->beginTransaction();
+        try {
+            $db->exec('DELETE FROM teacher_word_list');
+            $ins = $db->prepare('INSERT INTO teacher_word_list (word, position, set_at) VALUES (:w, :p, :t)');
+            $ts = sts_now();
+            foreach ($words as $i => $w) {
+                $ins->execute([':w' => $w, ':p' => $i, ':t' => $ts]);
+            }
+            $db->exec("UPDATE state SET word_source='teacher', word_list_version=word_list_version+1, version=version+1 WHERE id=1");
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        break;
+    }
+
+    case 'clearWordList': {
+        $db->beginTransaction();
+        try {
+            $db->exec('DELETE FROM teacher_word_list');
+            $stmt = $db->prepare("UPDATE state SET word_source = 'builtin:' || grade_level, word_list_version=word_list_version+1, version=version+1 WHERE id=1");
+            $stmt->execute();
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        break;
+    }
+
+    case 'setGradeLevel': {
+        $grade = $body['grade'] ?? null;
+        if (!is_int($grade) || $grade < 0 || $grade > 8) {
+            sts_json(400, ['error' => 'grade must be int 0–8']);
+            return;
+        }
+        // Map 0 → 'K', 1..8 → '1'..'8' for the source string.
+        $gradeStr = ($grade === 0) ? 'K' : (string)$grade;
+        $stmt = $db->prepare(
+            "UPDATE state
+             SET grade_level = :g,
+                 word_source = CASE WHEN word_source LIKE 'builtin:%' THEN 'builtin:' || :gs ELSE word_source END,
+                 word_list_version = word_list_version + 1,
+                 version = version + 1
+             WHERE id=1"
+        );
+        $stmt->execute([':g' => $grade, ':gs' => $gradeStr]);
+        break;
+    }
+
+    case 'pushWord': {
+        $word = strtolower(trim((string)($body['word'] ?? '')));
+        if (!preg_match('/^[a-z]{1,32}$/', $word)) {
+            sts_json(400, ['error' => 'word must be 1–32 lowercase letters']);
+            return;
+        }
+        $stmt = $db->prepare('UPDATE state SET push_word=:w, push_word_set_at=:t, version=version+1 WHERE id=1');
+        $stmt->execute([':w' => $word, ':t' => sts_now()]);
+        break;
+    }
+
     default:
         sts_json(400, ['error' => 'unknown action']);
         return;

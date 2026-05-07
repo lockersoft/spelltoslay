@@ -11,10 +11,11 @@ class TeacherTest extends TestCase
 
     protected function setUp(): void
     {
-        sts_db()->exec('UPDATE state SET paused=0, message="", force_reload=0, force_reload_set_at=0, version=0, poll_id=0, poll_question="", poll_options="[]" WHERE id=1');
+        sts_db()->exec('UPDATE state SET paused=0, message="", force_reload=0, force_reload_set_at=0, version=0, poll_id=0, poll_question="", poll_options="[]", word_source="builtin:6", grade_level=6, word_list_version=0, push_word="", push_word_set_at=0 WHERE id=1');
         sts_db()->exec('DELETE FROM scores');
         sts_db()->exec('DELETE FROM presence');
         sts_db()->exec('DELETE FROM poll_responses');
+        sts_db()->exec('DELETE FROM teacher_word_list');
     }
 
     public function test_rejects_missing_key(): void
@@ -270,5 +271,105 @@ class TeacherTest extends TestCase
         $this->assertSame(200, $status);
         $row = sts_db()->query('SELECT poll_question FROM state WHERE id=1')->fetch();
         $this->assertSame('', $row['poll_question']);
+    }
+
+    public function testSetWordListAcceptsPastedWords(): void
+    {
+        [$status, , $json] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setWordList', 'text' => "receive\nseparate\naccommodate\n"]
+        );
+        $this->assertSame(200, $status);
+        $this->assertTrue($json['ok']);
+
+        $rows = sts_db()->query('SELECT word FROM teacher_word_list ORDER BY position')->fetchAll();
+        $this->assertSame(['receive','separate','accommodate'], array_column($rows, 'word'));
+
+        $st = sts_db()->query('SELECT word_source, word_list_version FROM state WHERE id=1')->fetch();
+        $this->assertSame('teacher', $st['word_source']);
+        $this->assertGreaterThan(0, (int)$st['word_list_version']);
+    }
+
+    public function testSetWordListIgnoresBlankAndStripsCase(): void
+    {
+        sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setWordList', 'text' => "  Hello \n\n \nWORLD  \n\n"]
+        );
+        $rows = sts_db()->query('SELECT word FROM teacher_word_list ORDER BY position')->fetchAll();
+        $this->assertSame(['hello','world'], array_column($rows, 'word'));
+    }
+
+    public function testSetWordListRejectsEmpty(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setWordList', 'text' => "   \n\n  "]
+        );
+        $this->assertSame(400, $status);
+    }
+
+    public function testClearWordListEmptiesTableAndRevertsSource(): void
+    {
+        sts_db()->exec("INSERT INTO teacher_word_list (word, position, set_at) VALUES ('x',0,1)");
+        sts_db()->exec("UPDATE state SET word_source='teacher', grade_level=6 WHERE id=1");
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'clearWordList']
+        );
+        $this->assertSame(200, $status);
+        $this->assertSame(0, (int)sts_db()->query('SELECT COUNT(*) c FROM teacher_word_list')->fetch()['c']);
+        $st = sts_db()->query('SELECT word_source FROM state WHERE id=1')->fetch();
+        $this->assertSame('builtin:6', $st['word_source']);
+    }
+
+    public function testSetGradeLevelUpdatesStateOnlyWhenBuiltinActive(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setGradeLevel', 'grade' => 4]
+        );
+        $this->assertSame(200, $status);
+        $st = sts_db()->query('SELECT word_source, grade_level FROM state WHERE id=1')->fetch();
+        $this->assertSame(4, (int)$st['grade_level']);
+        $this->assertSame('builtin:4', $st['word_source']);
+    }
+
+    public function testSetGradeLevelKRejectsInvalid(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'setGradeLevel', 'grade' => 99]
+        );
+        $this->assertSame(400, $status);
+    }
+
+    public function testPushWordSetsStateField(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'pushWord', 'word' => 'necessary']
+        );
+        $this->assertSame(200, $status);
+        $st = sts_db()->query('SELECT push_word, push_word_set_at FROM state WHERE id=1')->fetch();
+        $this->assertSame('necessary', $st['push_word']);
+        $this->assertGreaterThan(0, (int)$st['push_word_set_at']);
+    }
+
+    public function testPushWordRejectsNonAlpha(): void
+    {
+        [$status] = sts_invoke(
+            'teacher.php', 'POST',
+            ['key' => 'test-teacher-key-xyz'],
+            ['action' => 'pushWord', 'word' => 'bad word!']
+        );
+        $this->assertSame(400, $status);
     }
 }
