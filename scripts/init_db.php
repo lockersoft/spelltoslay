@@ -112,6 +112,9 @@ if (!in_array('word_list_version', $existingStateColsV2, true)) {
 if (!in_array('push_word', $existingStateColsV2, true)) {
     $pdo->exec("ALTER TABLE state ADD COLUMN push_word TEXT NOT NULL DEFAULT ''");
 }
+if (!in_array('push_word_set_at', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN push_word_set_at INTEGER NOT NULL DEFAULT 0");
+}
 
 // ── SpellToSlay v1: teacher-uploaded word list ────────────────────────────
 $pdo->exec(<<<SQL

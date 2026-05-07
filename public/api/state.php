@@ -8,11 +8,21 @@ $now = sts_now();
 
 $row = $db->query(
     'SELECT paused, message, force_reload, force_reload_set_at, version,
-            poll_id, poll_question, poll_options FROM state WHERE id=1'
+            poll_id, poll_question, poll_options,
+            word_source, word_list_version, push_word, push_word_set_at
+     FROM state WHERE id=1'
 )->fetch();
 
 $forceReload = ((int)$row['force_reload'] === 1)
     && ($now - (int)$row['force_reload_set_at'] <= 10);
+
+$pushWord = (string)$row['push_word'];
+if ($pushWord !== '' && ((int)$row['push_word_set_at'] !== 0)
+    && ($now - (int)$row['push_word_set_at'] > 10)) {
+    // Server-side TTL: clear stale push word so latecomers don't all see the same one.
+    $db->exec("UPDATE state SET push_word='', push_word_set_at=0 WHERE id=1");
+    $pushWord = '';
+}
 
 // ── Input validation ────────────────────────────────────────────────────────
 $cid       = (string)($_GET['cid'] ?? '');
@@ -127,6 +137,9 @@ $payload = [
     'pollQuestion'    => $pollQuestion !== '' ? $pollQuestion : null,
     'pollOptions'     => $pollQuestion !== '' ? $pollOptions : null,
     'pollMyAnswer'    => $pollMyAnswer,
+    'wordSource'      => (string)$row['word_source'],
+    'wordListVersion' => (int)$row['word_list_version'],
+    'pushWord'        => $pushWord,
 ];
 
 $etag = '"v' . (int)$row['version'] . '"';

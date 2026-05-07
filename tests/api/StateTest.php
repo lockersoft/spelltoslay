@@ -178,4 +178,25 @@ class StateTest extends TestCase
         [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'uuid-voter']);
         $this->assertSame(1, $json['pollMyAnswer']);
     }
+
+    public function testStateExposesWordPoolFields(): void
+    {
+        sts_db()->exec("UPDATE state SET word_source='builtin:4', word_list_version=7, push_word='necessary', force_reload_set_at=" . sts_now() . " WHERE id=1");
+        [$status, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'test-cid-001']);
+        $this->assertSame(200, $status);
+        $this->assertSame('builtin:4', $json['wordSource']);
+        $this->assertSame(7,           $json['wordListVersion']);
+        $this->assertSame('necessary', $json['pushWord']);
+    }
+
+    public function testPushWordIsClearedAfterTtl(): void
+    {
+        // Set push_word with a stale set_at by using a raw timestamp 11s ago.
+        // We rely on the convention that state.force_reload_set_at doubles as
+        // a "last write" hint isn't appropriate — pushWord uses its own TTL via push_word_set_at.
+        // For this test, manipulate push_word directly and let state.php apply the TTL.
+        sts_db()->exec("UPDATE state SET push_word='stale', push_word_set_at=" . (sts_now() - 11) . " WHERE id=1");
+        [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'test-cid-002']);
+        $this->assertSame('', $json['pushWord']);
+    }
 }
