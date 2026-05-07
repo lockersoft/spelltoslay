@@ -2,10 +2,30 @@
 
 ## [Unreleased]
 
-- Project scaffolded from SLAY (https://slay.lockersoft.games). See
-  [docs/reference/slay/](docs/reference/slay/) for the parent project's
-  spec, plan, and architectural decisions. The shared infrastructure
-  (PHP+SQLite API, teacher control panel with roster/messaging/polls/
-  per-student pause, presence tracking, deploy story) is being reused
-  here; the gameplay layer will be replaced for the typing & spelling
-  game once brainstorming converges.
+## [0.1.0] — 2026-05-06
+
+Initial SpellToSlay v1 release. Forked from SLAY's infrastructure;
+gameplay layer is new.
+
+### Added
+- Spell-to-Slay arena: stationary hero, prefix-lock-on typing, letter-by-letter damage.
+- Built-in word lists for grades K–8 with three difficulty buckets.
+- Teacher-uploadable word list (paste this week's spelling words, override the built-in pool).
+- "Spell this now" push-word feature.
+- New score columns: wpm, accuracy, words_slain.
+- Corner-stat HUD (HP+wave, score+time, WPM+ACC+streak).
+
+### Changed
+- Renamed slay_* helpers to sts_*; project name SpellToSlay; domain spelltoslay.lockersoft.games.
+- localStorage keys migrated from slay_* to sts_*.
+
+### Inherited unchanged
+- Teacher panel (pause, message, force reload, polls, contributors, per-student controls).
+- Polling architecture (2s, ETag-based 304s).
+- Score submission and leaderboard endpoints (extended, not replaced).
+
+### Post-merge cleanup (manual, run after this branch lands on main)
+
+- Rename the local checkout: `mv ~/Documents/GitHub/typenspell ~/Documents/GitHub/spelltoslay`.
+- If a remote was added before the rename, fix it: `git remote set-url origin git@github.com:lockersoft/spelltoslay.git`.
+- Update any local SSH config aliases that referenced the old name.
