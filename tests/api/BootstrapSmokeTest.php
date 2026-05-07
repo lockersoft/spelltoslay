@@ -41,6 +41,7 @@ class BootstrapSmokeTest extends TestCase
         $this->assertContains('grade_level',        $cols);
         $this->assertContains('word_list_version',  $cols);
         $this->assertContains('push_word',          $cols);
+        $this->assertContains('push_word_set_at',   $cols);
     }
 
     public function testTeacherWordListTableExists(): void

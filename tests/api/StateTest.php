@@ -191,10 +191,8 @@ class StateTest extends TestCase
 
     public function testPushWordIsClearedAfterTtl(): void
     {
-        // Set push_word with a stale set_at by using a raw timestamp 11s ago.
-        // We rely on the convention that state.force_reload_set_at doubles as
-        // a "last write" hint isn't appropriate — pushWord uses its own TTL via push_word_set_at.
-        // For this test, manipulate push_word directly and let state.php apply the TTL.
+        // pushWord has its own TTL column (push_word_set_at), independent of force_reload_set_at.
+        // Set it 11s in the past and let state.php's TTL block clear it.
         sts_db()->exec("UPDATE state SET push_word='stale', push_word_set_at=" . (sts_now() - 11) . " WHERE id=1");
         [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'test-cid-002']);
         $this->assertSame('', $json['pushWord']);
