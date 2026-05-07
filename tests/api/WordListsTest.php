@@ -28,6 +28,12 @@ final class WordListsTest extends TestCase
             $this->assertArrayHasKey('easy',    $data, "grade-$g missing 'easy'");
             $this->assertArrayHasKey('medium',  $data, "grade-$g missing 'medium'");
             $this->assertArrayHasKey('hard',    $data, "grade-$g missing 'hard'");
+
+            // Field-value sanity
+            $this->assertSame((string)$g, (string)$data['grade'], "grade-$g.json has wrong 'grade' field");
+            $this->assertIsInt($data['version'], "grade-$g.json 'version' must be int");
+            $this->assertGreaterThanOrEqual(1, $data['version'], "grade-$g.json 'version' must be ≥1");
+
             foreach (['easy', 'medium', 'hard'] as $bucket) {
                 $this->assertIsArray($data[$bucket], "grade-$g $bucket is not an array");
                 $this->assertGreaterThanOrEqual(20, count($data[$bucket]),
@@ -37,6 +43,12 @@ final class WordListsTest extends TestCase
                     $this->assertMatchesRegularExpression('/^[a-z]+$/', $w,
                         "grade-$g $bucket contains non-lowercase-letter word: $w");
                 }
+                // Uniqueness — each word should appear at most once per bucket.
+                $this->assertSame(
+                    count($data[$bucket]),
+                    count(array_unique($data[$bucket])),
+                    "grade-$g $bucket contains duplicate words: " . implode(', ', array_keys(array_filter(array_count_values($data[$bucket]), fn($c) => $c > 1)))
+                );
             }
         }
     }
