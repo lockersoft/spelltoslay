@@ -187,10 +187,15 @@ render block.
 `state.effects = []`. Any in-flight orbs/rings vanish on reset, which is
 the correct behaviour (the run is over).
 
-Game-over does **not** clear effects mid-flight — the orb/ring that
-killed the last enemy plays out, then the game-over modal appears. The
-existing `state.gameOver` flag governs the modal; it does not stop
-`tick()` from rendering. No change needed.
+Game-over does **not** clear `state.effects`. Once `state.gameOver`
+flips, the `tick()` guard stops running `updateEffects` (it gates on
+`!state.gameOver`), so any in-flight orb visually **freezes** at its
+current interpolated position. The game-over modal is surfaced ~50 ms
+later by the polling `setInterval` and occludes the frozen artefact —
+so the user never sees a stuck orb in practice. If a future iteration
+wants the orb to genuinely play out across the game-over transition,
+move the `updateEffects(dt)` call outside the `gameOver` clause in
+`tick()`. v1 accepts the cheaper "modal covers it" behaviour.
 
 ## Performance
 

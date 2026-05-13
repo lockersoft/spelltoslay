@@ -98,6 +98,25 @@ test('single unambiguous enemy still slain per-keystroke', async ({ page }) => {
   expect(isSlain(dog)).toBe(true);
 });
 
+// Invariant: once an enemy is slain, it's removed from prefixIndex immediately
+// (even though it lingers in state.enemies as `dying: true` during the orb's
+// ~120 ms flight). So a stray keystroke right after a kill should land as a
+// typo — not as a prefix-extension that re-targets the dying enemy.
+test('typing past a slain word triggers a typo, not a lock onto the dying enemy', async ({ page }) => {
+  await bootSignedIn(page);
+  await resetArenaWith(page, [
+    { id: 'cat', word: 'cat', x: 200, y: 200 },
+  ]);
+  await page.locator('#type-input').focus();
+  await page.keyboard.type('catx');
+  const { cat, hp } = await page.evaluate(() => ({
+    cat: window.state.enemies.find(e => e.id === 'cat') || null,
+    hp:  window.state.hero.hp,
+  }));
+  expect(isSlain(cat)).toBe(true);    // dying or already spliced
+  expect(hp).toBeLessThan(100);       // the trailing 'x' fired the typo penalty
+});
+
 // Prefix-of-another: "a" is a complete word AND a prefix of "and". Typing
 // "and" naturally disambiguates and slays "and". Typing "a" alone leaves the
 // lock ambiguous (both still match), so the player presses Space to commit.
