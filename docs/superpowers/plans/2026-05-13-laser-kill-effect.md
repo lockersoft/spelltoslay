@@ -524,6 +524,8 @@ npx playwright test
 
 Expected: all tests pass. The suite asserts API/typing behaviour, not visual frames, so it should be unaffected. If a typing-flow test fails, suspect the dying-skip guard in `updateEnemies` — but no test in the current suite exercises a dying enemy because the kill is committed before any post-commit assertion.
 
+> **Correction (added 2026-05-13 during execution):** the prediction above was wrong. The 5 typing-prefix-collision tests assert `state.enemies.find(...).toBeNull()` immediately after a slay — but the new lifecycle keeps the slain enemy in `state.enemies` (with `dying: true`) for ~120 ms. The fix landed in commit `0e563e3`: add a module-scoped `isSlain(e) => e == null || e.dying === true` helper to `tests/e2e/typing-prefix-collision.spec.js`, replace the 6 `.toBeNull()` slain assertions with `expect(isSlain(...)).toBe(true)`. `.not.toBeNull()` bystander checks and `.hp` assertions are unaffected. The other E2E specs (`happy-path.spec.js`, `name-entry-focus.spec.js`) genuinely are unaffected — verified.
+
 - [ ] **Step 3: Manual reduced-motion sanity check**
 
 In macOS: System Settings → Accessibility → Display → toggle "Reduce motion" on. Hard-reload the browser. Play one wave.
