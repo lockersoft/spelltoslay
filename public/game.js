@@ -10,6 +10,14 @@ const BOSS_WAVE_INTERVAL = 5;
 const WPM_WINDOW_S = 30;
 const POLL_DISMISS_AFTER_MS = 15000;
 
+// `true` if the OS reports prefers-reduced-motion. Sampled once at load,
+// not reactive — a classroom user toggling the setting mid-run won't see
+// the orb appear/disappear partway through.
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' &&
+  window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // ─── Registries (students extend these) ──────────────
 const ENEMIES = [
   { id: 'ghost',  emoji: '👻',  difficultyClass: 'easy',   speed: 30, contactDamage: 10, pointMultiplier: 1, size: 28 },
@@ -411,13 +419,39 @@ function onEnemySlain(e) {
   state.kills += 1;
   state.streak += 1;
   if (state.streak > state.bestStreak) state.bestStreak = state.streak;
-  // Remove
+
+  // The enemy is dead-on-paper now. Pull it from the prefix index immediately
+  // so further typing can't match it. Reset the player's typing state.
   removeEnemyFromIndex(e);
-  state.enemies = state.enemies.filter(en => en.id !== e.id);
-  // Reset buffer; lock will refresh on next keystroke
   state.typedBuffer = '';
   state.lockedEnemyId = null;
   typeInput.value = '';
+
+  if (PREFERS_REDUCED_MOTION) {
+    // Skip the orb. Splice the enemy out now and play a brief ring at
+    // its last position.
+    state.enemies = state.enemies.filter(en => en.id !== e.id);
+    state.effects.push({
+      kind: 'ring',
+      x: e.x, y: e.y,
+      t0: state.time,
+      t1: state.time + 0.08,
+    });
+    return;
+  }
+
+  // Standard path: enemy enters dying state, orb flies from hero. The
+  // enemy is spliced from state.enemies by updateEffects when the orb
+  // lands.
+  e.dying = true;
+  state.effects.push({
+    kind: 'orb',
+    x0: state.hero.x, y0: state.hero.y,
+    x1: e.x,          y1: e.y,
+    t0: state.time,
+    t1: state.time + 0.12,
+    enemyId: e.id,
+  });
 }
 
 function flashLockedRed() {
@@ -768,7 +802,29 @@ function render() {
 
 // ─── Effects ─────────────────────────────────────────
 function updateEffects(dt) {
-  // Filled in by Task 3. Today this is a no-op: state.effects is always [].
+  if (state.effects.length === 0) return;
+  const survivors = [];
+  for (const fx of state.effects) {
+    if (state.time < fx.t1) {
+      survivors.push(fx);
+      continue;
+    }
+    // Expired.
+    if (fx.kind === 'orb') {
+      // Splice the dying enemy out of state.enemies, if still present
+      // (play-again or game-over reset may have cleared the list).
+      state.enemies = state.enemies.filter(en => en.id !== fx.enemyId);
+      // Hand off to a ring at the impact point.
+      survivors.push({
+        kind: 'ring',
+        x: fx.x1, y: fx.y1,
+        t0: state.time,
+        t1: state.time + 0.22,
+      });
+    }
+    // Expired rings just drop.
+  }
+  state.effects = survivors;
 }
 
 // ─── Main loop ───────────────────────────────────────
