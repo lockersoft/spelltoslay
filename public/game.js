@@ -26,7 +26,7 @@ const state = {
   time: 0,
   hero: { x: ARENA.w / 2, y: ARENA.h - 60, hp: MAX_HP },
   enemies: [],
-  particles: [],
+  effects: [],          // active visual effects: orb projectiles, ring shockwaves
   spawn: { nextAt: 0, wave: 1, waveStartedAt: 0 },
   score: 0,
   kills: 0,
@@ -216,6 +216,13 @@ function spawnOne(def) {
 function updateEnemies(dt) {
   const survivors = [];
   for (const e of state.enemies) {
+    if (e.dying) {
+      // Frozen during the orb's flight. Still in state.enemies so the
+      // dying emoji keeps rendering; removed by updateEffects when the
+      // orb lands.
+      survivors.push(e);
+      continue;
+    }
     // Walk straight toward hero
     const dx = state.hero.x - e.x, dy = state.hero.y - e.y;
     const dist = Math.hypot(dx, dy) || 1;
@@ -702,6 +709,11 @@ function render() {
   }
 }
 
+// ─── Effects ─────────────────────────────────────────
+function updateEffects(dt) {
+  // Filled in by Task 3. Today this is a no-op: state.effects is always [].
+}
+
 // ─── Main loop ───────────────────────────────────────
 let lastTs = performance.now();
 function tick(now) {
@@ -711,6 +723,7 @@ function tick(now) {
     state.time += dt;
     updateSpawner(dt);
     updateEnemies(dt);
+    updateEffects(dt);
   }
   render();
   requestAnimationFrame(tick);
@@ -787,6 +800,7 @@ async function renderLeaderboard() {
 playAgainBtn.addEventListener('click', () => {
   // Reset everything
   state.enemies.length = 0;
+  state.effects.length = 0;
   prefixIndex.clear();
   state.score = 0; state.kills = 0; state.streak = 0; state.bestStreak = 0;
   state.keystrokes = { correct: 0, total: 0 };
