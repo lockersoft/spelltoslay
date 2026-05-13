@@ -6,6 +6,7 @@
 - `public/favicon.svg` — sword-on-dark icon, referenced from index.html and teacher.html.
 - E2E regression test for the name-entry focus-steal bug.
 - Space / Enter as an explicit "commit current buffer" key. Needed when one live enemy's word is a prefix of another's (e.g. `a` and `and` both alive): typing `a` alone is ambiguous, so the player presses Space to commit the slay.
+- Laser-kill visual: an orb projectile flies from the hero to the enemy on word-slay, detonating as a ring shockwave at impact. The enemy freezes (`e.dying = true`) on commit and is removed when the orb lands. `prefers-reduced-motion` skips the orb and plays a brief ring.
 
 ### Fixed
 - Name-entry sign-in: typing your name now works. The gameplay typing input's blur-recapture (refocus 50ms after losing focus) was unconditional and stole focus from `#entry-name` mid-keystroke. Recapture now requires `state.running`, which is false while any modal is up.

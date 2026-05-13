@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 
+// After laser-kill effect (2026-05-13): a slain enemy stays in
+// state.enemies with `dying: true` for ~120 ms while the orb flies,
+// then is spliced out. Tests that assert "slain" should treat either
+// state as success.
+function isSlain(enemy) {
+  return enemy == null || enemy.dying === true;
+}
+
 // When two enemies share a prefix (cat / carry), per-keystroke "lock to closest"
 // damage means typing one full word doesn't slay it — early letters land on the
 // "wrong" enemy, and by the time the buffer disambiguates only one final letter
@@ -50,7 +58,7 @@ test('typing a word slays it even when another enemy shares its prefix', async (
     cat:   window.state.enemies.find(e => e.id === 'cat')   || null,
     carry: window.state.enemies.find(e => e.id === 'carry') || null,
   }));
-  expect(status.cat).toBeNull();          // slain by typing the full word
+  expect(isSlain(status.cat)).toBe(true);  // slain by typing the full word
   expect(status.carry).not.toBeNull();    // the bystander
   expect(status.carry.hp).toBe(5);        // never took damage during ambiguity
 });
@@ -72,7 +80,7 @@ test('typing a longer prefix-shared word still slays the correct enemy', async (
     carrot:   window.state.enemies.find(e => e.id === 'carrot')   || null,
     carrying: window.state.enemies.find(e => e.id === 'carrying') || null,
   }));
-  expect(status.carrying).toBeNull();
+  expect(isSlain(status.carrying)).toBe(true);
   expect(status.carry).not.toBeNull();
   expect(status.carry.hp).toBe(5);
   expect(status.carrot).not.toBeNull();
@@ -87,7 +95,7 @@ test('single unambiguous enemy still slain per-keystroke', async ({ page }) => {
   await page.locator('#type-input').focus();
   await page.keyboard.type('dog');
   const dog = await page.evaluate(() => window.state.enemies.find(e => e.id === 'dog') || null);
-  expect(dog).toBeNull();
+  expect(isSlain(dog)).toBe(true);
 });
 
 // Prefix-of-another: "a" is a complete word AND a prefix of "and". Typing
@@ -107,7 +115,7 @@ test('Space commits the buffer when prefix-of-another keeps it ambiguous', async
     a:   window.state.enemies.find(e => e.id === 'a')   || null,
     and: window.state.enemies.find(e => e.id === 'and') || null,
   }));
-  expect(s.and).toBeNull();
+  expect(isSlain(s.and)).toBe(true);
   expect(s.a).not.toBeNull();
   expect(s.a.hp).toBe(1);
 
@@ -116,7 +124,7 @@ test('Space commits the buffer when prefix-of-another keeps it ambiguous', async
   // size=1, exact match with no extension → auto-slay.
   await page.keyboard.type('a');
   s = await page.evaluate(() => window.state.enemies.find(e => e.id === 'a') || null);
-  expect(s).toBeNull();
+  expect(isSlain(s)).toBe(true);
 });
 
 test('Space commits "a" while "and" is still alive', async ({ page }) => {
@@ -147,7 +155,7 @@ test('Space commits "a" while "and" is still alive', async ({ page }) => {
     and: window.state.enemies.find(e => e.id === 'and') || null,
     buf: window.state.typedBuffer,
   }));
-  expect(s.a).toBeNull();
+  expect(isSlain(s.a)).toBe(true);
   expect(s.and).not.toBeNull();
   expect(s.and.hp).toBe(3);
   expect(s.buf).toBe('');
