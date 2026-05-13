@@ -714,15 +714,15 @@ function render() {
 
     // Word above the enemy — only for live enemies.
     if (!e.dying) {
-      ctx.font = '14px ui-monospace, monospace';
+      ctx.font = '17.5px ui-monospace, monospace';
       const word = e.word;
       const typed = word.slice(0, e.typedLen);
       const rest  = word.slice(e.typedLen);
       const wY = e.y - e.def.size / 2 - 8;
-      // Background pill
+      // Background pill (scaled 1.25× with the font so proportions hold)
       const padding = 6, w = ctx.measureText(word).width;
       ctx.fillStyle = '#1a2238';
-      ctx.fillRect(e.x - w/2 - padding, wY - 12, w + padding*2, 22);
+      ctx.fillRect(e.x - w/2 - padding, wY - 15, w + padding*2, 27.5);
       // Typed (green)
       ctx.fillStyle = '#06d6a0';
       ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);

@@ -15,6 +15,7 @@
 ### Changed
 - `deploy.php` repository URL switched from `github-spelltoslay:` (alias never set up server-side) to `github.com:lockersoft/spelltoslay.git`, which uses the server's existing github.com SSH config.
 - `composer.lock` content-hash refreshed against composer.json so production `composer install` no longer warns.
+- Enemy word labels are 25% larger (font 14→17.5 px, pill 22→27.5 px tall) so words are easier to read across the room.
 
 ## [0.1.0] — 2026-05-06
 
