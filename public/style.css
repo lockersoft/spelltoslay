@@ -95,6 +95,15 @@ html, body {
   padding: 6px 8px;
   user-select: all;
 }
+.word-size {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 12px ui-monospace, "SF Mono", Menlo, monospace;
+  color: #6e7681;
+  padding: 6px 8px;
+  user-select: none;
+}
+.word-size input[type="range"] { width: 100px; accent-color: #5b8def; }
+.word-size span { min-width: 2ch; text-align: right; color: #cde; }
 
 #leaderboard ol { padding-left: 20px; max-height: 220px; overflow-y: auto; }
 #leaderboard li { padding: 2px 0; }

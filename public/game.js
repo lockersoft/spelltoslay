@@ -45,6 +45,8 @@ const state = {
   // Typing
   typedBuffer: '',
   lockedEnemyId: null,
+  // Per-browser visual preferences
+  wordFontSize: 22,    // px; user-adjustable via the footer slider, persisted in localStorage
   // Word pool
   wordPool: [],
   wordSource: '',
@@ -79,6 +81,21 @@ state.clientId = (() => {
   return cid;
 })();
 state.playerName = localStorage.getItem('sts_player_name') || '';
+{
+  const stored = parseInt(localStorage.getItem('sts_word_font_size'), 10);
+  if (Number.isFinite(stored) && stored >= 12 && stored <= 40) state.wordFontSize = stored;
+}
+
+const wordSizeSlider = document.getElementById('word-size-slider');
+const wordSizeValue  = document.getElementById('word-size-value');
+wordSizeSlider.value = String(state.wordFontSize);
+wordSizeValue.textContent = String(state.wordFontSize);
+wordSizeSlider.addEventListener('input', () => {
+  const v = Math.max(12, Math.min(40, parseInt(wordSizeSlider.value, 10) || 22));
+  state.wordFontSize = v;
+  wordSizeValue.textContent = String(v);
+  localStorage.setItem('sts_word_font_size', String(v));
+});
 
 const nameEntryEl   = document.getElementById('name-entry');
 const entryNameInput = document.getElementById('entry-name');
@@ -485,7 +502,10 @@ function elapsedHHMMSS() {
 typeInput.addEventListener('input', onType);
 // Recapture focus only during gameplay. While a modal is up (name entry, game over),
 // state.running is false and the user is typing into a different input — don't steal.
-typeInput.addEventListener('blur',  () => setTimeout(() => { if (state.running) typeInput.focus(); }, 50));
+typeInput.addEventListener('blur',  () => setTimeout(() => {
+  // Don't steal focus back from the word-size slider — the user is adjusting it.
+  if (state.running && document.activeElement !== wordSizeSlider) typeInput.focus();
+}, 50));
 window.addEventListener('load',     () => { if (state.running) typeInput.focus(); });
 
 // ─── Polling ─────────────────────────────────────────
@@ -714,15 +734,19 @@ function render() {
 
     // Word above the enemy — only for live enemies.
     if (!e.dying) {
-      ctx.font = '21.875px ui-monospace, monospace';
+      // Font + pill scale uniformly from state.wordFontSize (user-adjustable).
+      // The 14/12/22 base values come from the original v1 design at 14 px font.
+      const fs = state.wordFontSize;
+      const sc = fs / 14;
+      ctx.font = `${fs}px ui-monospace, monospace`;
       const word = e.word;
       const typed = word.slice(0, e.typedLen);
       const rest  = word.slice(e.typedLen);
       const wY = e.y - e.def.size / 2 - 8;
-      // Background pill (scaled 1.25× with the font so proportions hold)
+      // Background pill
       const padding = 6, w = ctx.measureText(word).width;
       ctx.fillStyle = '#1a2238';
-      ctx.fillRect(e.x - w/2 - padding, wY - 18.75, w + padding*2, 34.375);
+      ctx.fillRect(e.x - w/2 - padding, wY - 12 * sc, w + padding*2, 22 * sc);
       // Typed (green)
       ctx.fillStyle = '#06d6a0';
       ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);
