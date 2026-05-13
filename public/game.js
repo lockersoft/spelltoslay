@@ -598,6 +598,52 @@ function updatePollOverlay(s) {
   }
 }
 
+// ─── Effect drawing helpers ──────────────────────────
+function drawOrb(fx, p) {
+  // p is normalized progress 0..1 over the orb's lifetime.
+  const x = fx.x0 + (fx.x1 - fx.x0) * p;
+  const y = fx.y0 + (fx.y1 - fx.y0) * p;
+
+  // Trail: hero → current pos, locked-blue, 25% opacity, no glow.
+  ctx.strokeStyle = 'rgba(91, 141, 239, 0.25)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(fx.x0, fx.y0);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+
+  // Orb: radial gradient, white core → locked-blue → transparent.
+  const r = 8;
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, r * 2);
+  grad.addColorStop(0,   '#ffffff');
+  grad.addColorStop(0.4, '#5b8def');
+  grad.addColorStop(1,   'rgba(91, 141, 239, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawRing(fx, p) {
+  // Ease-out for radius growth; linear fade for opacity.
+  const ease = 1 - (1 - p) * (1 - p);
+  const alpha = 1 - p;
+
+  // Outer locked-blue ring.
+  ctx.strokeStyle = `rgba(91, 141, 239, ${0.85 * alpha})`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(fx.x, fx.y, 6 + (36 - 6) * ease, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner white ring.
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.7 * alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(fx.x, fx.y, 4 + (22 - 4) * ease, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 // ─── Render ──────────────────────────────────────────
 function render() {
   if (state.typedBuffer !== '') refreshLock();
@@ -610,14 +656,14 @@ function render() {
   ctx.font = `${HERO.size}px serif`;
   ctx.fillText(HERO.emoji, state.hero.x, state.hero.y);
 
-  // Enemies (Task 10 fills in real rendering)
+  // Enemies
   for (const e of state.enemies) {
     ctx.font = `${e.def.size}px serif`;
     ctx.fillStyle = '#fff';
     ctx.fillText(e.def.emoji, e.x, e.y);
 
-    // Locked ring
-    if (e.id === state.lockedEnemyId) {
+    // Locked ring (skipped for dying — the lock indicator on a corpse is noise).
+    if (!e.dying && e.id === state.lockedEnemyId) {
       ctx.strokeStyle = '#5b8def';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -632,22 +678,33 @@ function render() {
       ctx.fill();
     }
 
-    // Word above the enemy
-    ctx.font = '14px ui-monospace, monospace';
-    const word = e.word;
-    const typed = word.slice(0, e.typedLen);
-    const rest  = word.slice(e.typedLen);
-    const wY = e.y - e.def.size / 2 - 8;
-    // Background pill
-    const padding = 6, w = ctx.measureText(word).width;
-    ctx.fillStyle = '#1a2238';
-    ctx.fillRect(e.x - w/2 - padding, wY - 12, w + padding*2, 22);
-    // Typed (green)
-    ctx.fillStyle = '#06d6a0';
-    ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);
-    // Untyped (white)
-    ctx.fillStyle = '#cde';
-    ctx.fillText(rest, e.x - w/2 + ctx.measureText(typed).width + ctx.measureText(rest).width/2, wY);
+    // Word above the enemy — only for live enemies.
+    if (!e.dying) {
+      ctx.font = '14px ui-monospace, monospace';
+      const word = e.word;
+      const typed = word.slice(0, e.typedLen);
+      const rest  = word.slice(e.typedLen);
+      const wY = e.y - e.def.size / 2 - 8;
+      // Background pill
+      const padding = 6, w = ctx.measureText(word).width;
+      ctx.fillStyle = '#1a2238';
+      ctx.fillRect(e.x - w/2 - padding, wY - 12, w + padding*2, 22);
+      // Typed (green)
+      ctx.fillStyle = '#06d6a0';
+      ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);
+      // Untyped (white)
+      ctx.fillStyle = '#cde';
+      ctx.fillText(rest, e.x - w/2 + ctx.measureText(typed).width + ctx.measureText(rest).width/2, wY);
+    }
+  }
+
+  // Effects (orbs, rings). Drawn after enemies so they sit above the play
+  // field, but before the HUD (HUD lives further down in render()).
+  for (const fx of state.effects) {
+    const p = (state.time - fx.t0) / (fx.t1 - fx.t0);
+    if (p < 0 || p > 1) continue;
+    if (fx.kind === 'orb')  drawOrb(fx, p);
+    else if (fx.kind === 'ring') drawRing(fx, p);
   }
 
   // ── HUD ──
