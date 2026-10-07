@@ -38,6 +38,18 @@ test('two labels wanting the same spot do not overlap', async ({ page }) => {
   for (const r of rects) expect(inside(r), r.id).toBe(true);
 });
 
+test('six labels stacked at the top edge all find a free row', async ({ page }) => {
+  await boot(page);
+  const rects = await page.evaluate((arena) => window.layoutLabels(
+    Array.from({ length: 6 }, (_, i) => ({ id: 'l' + i, x: 300, y: 0, w: 100, h: 34 })), arena), ARENA);
+  for (let i = 0; i < rects.length; i++) {
+    expect(inside(rects[i]), rects[i].id).toBe(true);
+    for (let j = i + 1; j < rects.length; j++) {
+      expect(overlap(rects[i], rects[j]), `${i} vs ${j}`).toBe(false);
+    }
+  }
+});
+
 test('real render: 32-letter words at the largest size stay readable at both walls', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));

@@ -14,7 +14,9 @@ export function layoutLabels(items, arena) {
                 cx: clampAxis(it.x, it.w, arena.w),
                 cy: clampAxis(it.y, it.h, arena.h) };
     const homeY = r.cy;
-    for (let n = 1; n <= 8 && placed.some(p => hits(p, r)); n++) {
+    // Enough steps to reach every row of the arena in either direction.
+    const maxSteps = 2 * Math.ceil(arena.h / (it.h + 2));
+    for (let n = 1; n <= maxSteps && placed.some(p => hits(p, r)); n++) {
       // Alternate above/below the wanted row: -1, +1, -2, +2, ...
       const step = Math.ceil(n / 2) * (n % 2 === 1 ? -1 : 1);
       r.cy = clampAxis(homeY + step * (it.h + 2), it.h, arena.h);

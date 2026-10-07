@@ -86,7 +86,10 @@ async function submitName() {
   localStorage.setItem('sts_player_name', v);
   nameEntryEl.classList.add('hidden');
   entryErrorEl.classList.add('hidden');
-  if (nameModalMode === 'first') {
+  // The first-name modal can also reopen over an ended run (the server
+  // rejected a saved name after the player had already died): then the new
+  // name is for the score about to be submitted, not a signal to resume.
+  if (nameModalMode === 'first' && !state.gameOver) {
     state.running = true;
     typeInput.focus();
   } else {

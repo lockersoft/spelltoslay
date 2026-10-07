@@ -108,3 +108,30 @@ test('changing name while the teacher has paused the class works and stays pause
     await teacher(request, { action: 'resume' });
   }
 });
+
+test('a name rejected after the run already ended does not restart the dead run', async ({ page }) => {
+  // Server unreachable at first: the saved (disallowed) name is not caught yet.
+  await page.route('**/api/state.php*', (route) => route.abort());
+  await page.route('**/api/rename.php', (route) => route.abort());
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      localStorage.setItem('sts_player_name', 'shithead');
+      sessionStorage.setItem('seeded', '1');
+    }
+  });
+  await page.goto('/');
+  await page.waitForFunction(() => window.state && window.state.running);
+  await die(page);
+  await expect(page.locator('#game-over')).toBeVisible();
+  // Connectivity returns; the next poll rejects the name.
+  await page.unroute('**/api/state.php*');
+  await page.unroute('**/api/rename.php');
+  await expect(page.locator('#name-entry')).toBeVisible({ timeout: 6000 });
+  await page.locator('#entry-name').fill('Good');
+  await page.locator('#start-playing').click();
+  await expect(page.locator('#name-entry')).toBeHidden();
+  await expect(page.locator('#game-over')).toBeVisible();
+  await expect(page.locator('#game-over-name')).toHaveText('Good');
+  expect(await page.evaluate(() => ({ running: window.state.running, over: window.state.gameOver })))
+    .toEqual({ running: false, over: true });
+});
