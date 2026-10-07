@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test('happy path: type a word, see score submitted', async ({ page }) => {
+  // Any uncaught script error fails the run (a broken import would land here).
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/');
 
   // Name entry
@@ -35,4 +38,5 @@ test('happy path: type a word, see score submitted', async ({ page }) => {
   await page.locator('#submit-score').click();
   await expect(page.locator('#leaderboard')).toBeVisible({ timeout: 4000 });
   await expect(page.locator('#lb-alltime li').first()).toContainText('E2E');
+  expect(errors).toEqual([]);
 });

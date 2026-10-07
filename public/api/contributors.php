@@ -8,11 +8,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     return;
 }
 
-$config   = sts_config();
-$expected = $config['teacher_key'] ?? null;
-$provided = $_GET['key'] ?? '';
-if (!$expected || !is_string($provided) || !hash_equals($expected, $provided)) {
-    sts_json(403, ['error' => 'forbidden']);
+if (!sts_require_teacher()) {
     return;
 }
 

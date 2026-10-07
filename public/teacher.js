@@ -1,16 +1,49 @@
-'use strict';
+import { postJson } from './js/api.js';
 
-const url = new URL(location.href);
-let key = url.searchParams.get('key') || sessionStorage.getItem('sts_teacher_key') || '';
-if (key) sessionStorage.setItem('sts_teacher_key', key);
+// The key arrives once in the URL (fragment preferred, ?key= for old
+// bookmarks), is kept for this tab in sessionStorage, and is then removed from
+// the address bar so it is not on screen when the panel is projected.
+function readKeyFromUrl() {
+  const url = new URL(location.href);
+  const fromHash = new URLSearchParams(url.hash.replace(/^#/, '')).get('key');
+  const fromQuery = url.searchParams.get('key');
+  if (fromHash || fromQuery) {
+    url.searchParams.delete('key');
+    history.replaceState(null, '', url.pathname + url.search);
+  }
+  return fromHash || fromQuery || '';
+}
+
+function storedKey() {
+  try { return sessionStorage.getItem('sts_teacher_key') || ''; } catch (_) { return ''; }
+}
+
+let key = readKeyFromUrl() || storedKey();
+try { if (key) sessionStorage.setItem('sts_teacher_key', key); } catch (_) { /* key lives for this page only */ }
 
 const gate = document.getElementById('auth-gate');
 const panel = document.getElementById('control-panel');
 const errEl = document.getElementById('teacher-error');
+const timers = [];
 
-if (!key) {
-  // Stay on the gate.
-} else {
+const WRONG_KEY = 'That key was not accepted. Open this page again with the right key.';
+function showGate(message) {
+  timers.splice(0).forEach(clearInterval);
+  key = '';
+  try { sessionStorage.removeItem('sts_teacher_key'); } catch (_) {}
+  panel.classList.add('hidden');
+  gate.classList.remove('hidden');
+  if (message) document.getElementById('auth-gate-message').textContent = message;
+}
+
+// All teacher-only requests go through here so the key is a header, never a URL.
+async function teacherFetch(path, init = {}) {
+  const r = await fetch(path, { ...init, headers: { ...(init.headers || {}), 'X-Teacher-Key': key } });
+  if (r.status === 403) showGate(WRONG_KEY);
+  return r;
+}
+
+if (key) {
   gate.classList.add('hidden');
   panel.classList.remove('hidden');
   init();
@@ -23,11 +56,8 @@ function showError(msg) {
 }
 
 async function action(payload) {
-  const r = await fetch(`/api/teacher.php?key=${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const r = await postJson('/api/teacher.php', payload, { 'X-Teacher-Key': key });
+  if (r.status === 403) showGate(WRONG_KEY);
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
     showError(j.error || `HTTP ${r.status}`);
@@ -48,15 +78,29 @@ function setPauseButton(paused) {
 let activePoll = null; // { pollId, question, options }
 let lastPlayers = [];  // cached for poll tally
 
+// Mirror a server value into an input without destroying what the teacher is
+// typing. The input is overwritten only while it still shows the last value we
+// put there (the teacher has not edited it) and is not focused. The baseline
+// only moves when the field really shows the server's value.
+function syncInput(input, serverValue) {
+  const synced = input.dataset.synced ?? '';
+  if (input.value === serverValue) {
+    input.dataset.synced = serverValue;
+    return;
+  }
+  if (input.value === synced && document.activeElement !== input) {
+    input.value = serverValue;
+    input.dataset.synced = serverValue;
+  }
+}
+
 async function refreshState() {
   try {
     const r = await fetch('/api/state.php', { cache: 'no-store' });
     const s = await r.json();
     setPauseButton(!!s.paused);
     document.getElementById('player-count').textContent = `● ${s.playerCount} players`;
-    if (document.getElementById('msg-input') !== document.activeElement) {
-      document.getElementById('msg-input').value = s.message || '';
-    }
+    syncInput(document.getElementById('msg-input'), s.message || '');
 
     // Poll state mirroring (teacher view).
     const wasActive = !!activePoll;
@@ -110,7 +154,7 @@ async function refreshLeaderboard() {
 
 async function refreshRoster() {
   try {
-    const r = await fetch(`/api/players.php?key=${encodeURIComponent(key)}`, { cache: 'no-store' });
+    const r = await teacherFetch('/api/players.php', { cache: 'no-store' });
     if (!r.ok) return;
     const data = await r.json();
     lastPlayers = data.players;
@@ -156,11 +200,15 @@ function createRosterRow(cid) {
   `;
 
   div.querySelector('.send-personal').addEventListener('click', async () => {
-    const text = div.querySelector('.roster-msg').value;
+    const input = div.querySelector('.roster-msg');
+    const text = input.value;
     await action({ action: 'messageStudent', cid, text });
+    if (input.value === text) input.dataset.synced = text;
   });
   div.querySelector('.clear-personal').addEventListener('click', async () => {
-    div.querySelector('.roster-msg').value = '';
+    const input = div.querySelector('.roster-msg');
+    input.value = '';
+    input.dataset.synced = '';
     await action({ action: 'messageStudent', cid, text: '' });
   });
   div.querySelector('.pause-personal').addEventListener('click', async () => {
@@ -200,11 +248,8 @@ function updateRosterRow(row, player) {
   row.querySelector('[data-stat="wave"]').textContent  = `🌊 ${player.wave}`;
   row.querySelector('[data-stat="hp"]').textContent    = `❤️ ${player.hp}`;
 
-  // Personal message: only update if not focused.
-  const input = row.querySelector('.roster-msg');
-  if (document.activeElement !== input) {
-    input.value = player.personalMessage || '';
-  }
+  // Personal message: keep an unsent draft.
+  syncInput(row.querySelector('.roster-msg'), player.personalMessage || '');
 
   // Pause button.
   const btn = row.querySelector('.pause-personal');
@@ -301,7 +346,7 @@ function renderPollTally() {
 
 async function refreshContributors() {
   try {
-    const r = await fetch(`/api/contributors.php?key=${encodeURIComponent(key)}`, { cache: 'no-store' });
+    const r = await teacherFetch('/api/contributors.php', { cache: 'no-store' });
     if (!r.ok) return;
     const data = await r.json();
     const ul = document.getElementById('contributors-list');
@@ -334,8 +379,10 @@ function init() {
   });
 
   const sendMsg = async () => {
-    const v = document.getElementById('msg-input').value;
+    const input = document.getElementById('msg-input');
+    const v = input.value;
     await action({ action: 'message', text: v });
+    if (input.value === v) input.dataset.synced = v;
     refreshState();
   };
   document.getElementById('send-msg').addEventListener('click', sendMsg);
@@ -343,7 +390,9 @@ function init() {
     if (e.key === 'Enter') sendMsg();
   });
   document.getElementById('clear-msg').addEventListener('click', async () => {
-    document.getElementById('msg-input').value = '';
+    const input = document.getElementById('msg-input');
+    input.value = '';
+    input.dataset.synced = '';
     await action({ action: 'message', text: '' });
     refreshState();
   });
@@ -375,10 +424,12 @@ function init() {
     refreshState();
   });
 
-  setInterval(refreshState, 2000);
-  setInterval(refreshLeaderboard, 5000);
-  setInterval(refreshRoster, 2000);
-  setInterval(refreshContributors, 30000);
+  timers.push(
+    setInterval(refreshState, 2000),
+    setInterval(refreshLeaderboard, 5000),
+    setInterval(refreshRoster, 2000),
+    setInterval(refreshContributors, 30000),
+  );
   refreshState();
   refreshLeaderboard();
   refreshRoster();

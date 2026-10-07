@@ -19,13 +19,8 @@ if ($cid === '' || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $cid)) {
 }
 
 // Validate name.
-if ($name === '' || mb_strlen($name) > 16 || !preg_match('/^[A-Za-z0-9 ]{1,16}$/', $name)) {
-    sts_json(400, ['error' => 'name must be 1–16 alphanumeric characters (with spaces)']);
-    return;
-}
-
-if (sts_is_profane($name)) {
-    sts_json(400, ['error' => 'name not allowed']);
+if (($nameError = sts_name_error($name)) !== null) {
+    sts_json(400, ['error' => $nameError]);
     return;
 }
 

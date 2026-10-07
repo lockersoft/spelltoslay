@@ -11,18 +11,11 @@
   <main id="game-root">
     <header class="topbar">
       <h1>SpellToSlay</h1>
-      <div class="hud" id="hud">
-        <span id="hud-hp"></span>
-        <span id="hud-score"></span>
-        <span id="hud-wave"></span>
-        <span id="hud-time"></span>
-      </div>
+      <div class="hud" id="hud"></div>
     </header>
 
     <div class="stage">
       <canvas id="arena" width="960" height="600"></canvas>
-
-      <div id="overlay" class="overlay hidden" aria-live="polite"></div>
 
       <!-- Feature 12: Poll overlay (non-blocking, stays over game) -->
       <div id="poll-overlay" class="poll-overlay hidden">
@@ -31,10 +24,11 @@
       </div>
 
       <div id="name-entry" class="modal hidden">
-        <h2>Welcome to SpellToSlay</h2>
+        <h2 id="name-entry-title">Welcome to SpellToSlay</h2>
         <p>What's your name? (1–16 letters/numbers/spaces)</p>
         <label><input id="entry-name" maxlength="16" autocomplete="off" placeholder="Your name"></label>
         <button id="start-playing">Start playing</button>
+        <button id="cancel-name" class="secondary hidden">Cancel</button>
         <p id="entry-error" class="error hidden"></p>
       </div>
 
@@ -43,13 +37,14 @@
         <p id="game-over-summary"></p>
         <p>Submitting as <strong id="game-over-name"></strong> · <a href="#" id="change-name">Change name</a></p>
         <button id="submit-score">Submit score</button>
+        <button id="skip-submit" class="secondary">Play again without submitting</button>
         <p id="submit-error" class="error hidden"></p>
       </div>
 
       <div id="leaderboard" class="modal hidden">
         <h2>Leaderboard</h2>
         <p id="rank-summary"></p>
-        <h3>Today</h3>
+        <h3>Last 24 hours</h3>
         <ol id="lb-today"></ol>
         <h3>All time</h3>
         <ol id="lb-alltime"></ol>
@@ -77,6 +72,6 @@
     </div>
   </main>
 
-  <script src="/game.js" defer></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>

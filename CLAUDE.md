@@ -49,13 +49,29 @@ DreamHost manages all that.
   in `public/` disables caching on `.js`/`.html`/`.css`. Keep that file.
 - WASD keys can't be intercepted globally with `preventDefault()` — it
   blocks typing in inputs. The `isTyping` guard pattern in
-  `public/game.js` solves it. **For a typing game this is even more
+  `public/js/typing.js` solves it. **For a typing game this is even more
   load-bearing.**
 - The polling cadence is 2 seconds. If you change it, also change the
   client polling intervals.
-- Profanity check is centralized in `public/api/_bootstrap.php` as
-  `sts_is_profane()` — used by `score.php`, `rename.php`, and
-  `teacher.php`.
+- Name validation is centralized in `public/api/_bootstrap.php`:
+  `sts_name_error()` (shape + profanity) wraps `sts_is_profane()` and is
+  used by `score.php`, `rename.php`, `teacher.php` and `state.php`.
+- The game client is ES modules under `public/js/` (entry `main.js`), loaded
+  with `<script type="module">` — no build step. `window.state` and the
+  other test hooks exist only when the hostname is `localhost`.
+- JSON POST bodies are sent as `{"z": base64url(JSON)}` (`public/js/api.js`,
+  unwrapped in `sts_input_json()`), because DreamHost's mod_security rejects
+  SQL-looking free text. Plain JSON bodies are still accepted.
+- The teacher key is sent as an `X-Teacher-Key` header
+  (`sts_require_teacher()`); `?key=` still works server-side. The panel reads
+  the key from `teacher.html#key=…` or `?key=…` and strips it from the URL.
+- `public/api/score.php` cross-checks score/wave/kills/duration against
+  bounds mirrored from `public/js/constants.js`. Raising a
+  `pointMultiplier` above 4 or changing `WAVE_DURATION_S` needs the server
+  bound raised too, or honest scores get rejected.
+- Playwright runs with one worker against a temp SQLite file and the key
+  `e2e-key` (env vars `STS_DB_PATH` / `STS_TEACHER_KEY`); it does not touch
+  `data/` or `config/config.php`.
 
 ## Files unique to this fork (not in SLAY)
 

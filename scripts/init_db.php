@@ -4,14 +4,15 @@ declare(strict_types=1);
 /**
  * Idempotent SQLite schema initializer.
  *
- * Reads STS_DB_PATH if defined (test bootstrap sets this), otherwise
+ * Reads the STS_DB_PATH constant (PHPUnit bootstrap) or environment variable
+ * (Playwright's throwaway server) if set, otherwise
  * falls back to the production location. Creates tables IF NOT EXISTS,
  * so it's safe to run on every deploy.
  */
 
 $dbPath = defined('STS_DB_PATH')
     ? STS_DB_PATH
-    : __DIR__ . '/../data/spelltoslay.db';
+    : (getenv('STS_DB_PATH') ?: __DIR__ . '/../data/spelltoslay.db');
 
 @mkdir(dirname($dbPath), 0775, recursive: true);
 

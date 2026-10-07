@@ -23,12 +23,12 @@ Reusable as-is (touch lightly if at all):
   contributors. Already great; mostly reusable.
 - Test harness (PHPUnit + Playwright), composer setup, .gitignore,
   Deployer recipe, .htaccess cache headers, VERSION_BASE pattern.
-- Player-side scaffolding in `public/index.html` and `public/game.js`:
+- Player-side scaffolding in `public/index.html` and the ES modules in `public/js/` (entry point `main.js`):
   name-entry modal, polling, pause overlay, message bar, build-version
   display, score submission, leaderboard view.
 
 Will be REPLACED for the typing game:
-- `public/game.js`'s gameplay loop (arena combat → typing mechanics).
+- The gameplay loop in `public/js/` (was `public/game.js`) (arena combat → typing mechanics).
 - HUD elements specific to combat (HP, wave) → typing equivalents (WPM,
   accuracy, streak).
 - Possibly the `scores` table fields (currently `score, wave, duration`

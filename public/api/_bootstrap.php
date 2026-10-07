@@ -1,15 +1,21 @@
 <?php
 declare(strict_types=1);
 
-// Detect test mode (constants defined by tests/bootstrap.php).
+// Settings precedence: PHP constant (PHPUnit bootstrap) > environment variable
+// (Playwright's throwaway server) > on-disk default (production).
+$envDb  = getenv('STS_DB_PATH');
+$envKey = getenv('STS_TEACHER_KEY');
+
 $dbPath = defined('STS_DB_PATH')
     ? STS_DB_PATH
-    : __DIR__ . '/../../data/spelltoslay.db';
+    : ($envDb ?: __DIR__ . '/../../data/spelltoslay.db');
 
 $config = ['teacher_key' => null];
 $configFile = __DIR__ . '/../../config/config.php';
 if (defined('STS_TEACHER_KEY')) {
     $config['teacher_key'] = STS_TEACHER_KEY;
+} elseif ($envKey) {
+    $config['teacher_key'] = $envKey;
 } elseif (file_exists($configFile)) {
     $config = array_merge($config, require $configFile);
 }
@@ -47,7 +53,18 @@ function sts_input_json(): array {
     $raw = sts_input_raw();
     if ($raw === '') return [];
     $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    if (!is_array($decoded)) return [];
+    // Clients send {"z": base64url(JSON object)} because DreamHost's
+    // mod_security reads request bodies and rejects free text that resembles
+    // SQL (a spelling list with "union" and "select" on adjacent lines is
+    // enough). A plain JSON body is still accepted, for curl and for clients
+    // loaded before this was deployed.
+    if (count($decoded) === 1 && isset($decoded['z']) && is_string($decoded['z'])) {
+        $json  = base64_decode(strtr($decoded['z'], '-_', '+/'), true);
+        $inner = ($json !== false && str_starts_with(ltrim($json), '{')) ? json_decode($json, true) : null;
+        return is_array($inner) ? $inner : [];
+    }
+    return $decoded;
 }
 
 /**
@@ -77,13 +94,56 @@ function sts_json(int $status, array|string $body): void {
 function sts_now(): int { return time(); }
 
 /**
- * Shared profanity wordlist. Returns true if the name contains a banned word.
+ * Gate for teacher-only endpoints. Emits the 403 itself; callers just return.
+ * The key travels in the X-Teacher-Key header so it stays out of URLs, browser
+ * history and access logs; ?key= is still honoured for curl and old bookmarks.
+ * When the header is present it is the only thing checked.
+ */
+function sts_require_teacher(): bool {
+    $expected = sts_config()['teacher_key'] ?? null;
+    $provided = $_SERVER['HTTP_X_TEACHER_KEY'] ?? ($_GET['key'] ?? '');
+    if (!$expected || !is_string($provided) || !hash_equals((string)$expected, $provided)) {
+        sts_json(403, ['error' => 'forbidden']);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Shared name profanity check.
+ *
+ * Two lists, because substring matching alone blocks innocent names
+ * ("Dickens", "Cassie"): strong words are matched anywhere, including across
+ * spaces ("f u c k"); the rest only as a whole space-separated word. Common
+ * digit-for-letter swaps are normalised first ("sh1t", "a55").
  */
 function sts_is_profane(string $name): bool {
-    static $bannedWords = ['shit','fuck','bitch','cunt','asshole','damn','dick'];
-    $lc = strtolower($name);
-    foreach ($bannedWords as $w) {
-        if (str_contains($lc, $w)) return true;
+    static $anywhere = ['fuck','shit','bitch','cunt','asshole','nigger','nigga','faggot',
+                        'whore','slut','pussy','penis','vagina'];
+    static $wholeWord = ['ass','arse','damn','dick','cock','piss','crap','fag','tit','tits',
+                         'sex','porn','hoe','wtf','stfu','poop','butt'];
+
+    $norm = strtr(strtolower($name), ['0' => 'o', '1' => 'i', '3' => 'e', '4' => 'a', '5' => 's', '7' => 't']);
+    $joined = preg_replace('/[^a-z]/', '', $norm);
+    foreach ($anywhere as $w) {
+        if (str_contains($joined, $w)) return true;
+    }
+    foreach (preg_split('/[^a-z]+/', $norm, -1, PREG_SPLIT_NO_EMPTY) as $token) {
+        if (in_array($token, $wholeWord, true)) return true;
     }
     return false;
+}
+
+/**
+ * One rule for every place a player name enters the system.
+ * Returns null when acceptable, otherwise the message to show the user.
+ */
+function sts_name_error(string $name): ?string {
+    if (!preg_match('/^[A-Za-z0-9 ]{1,16}$/', $name)) {
+        return 'name must be 1–16 letters, numbers, or spaces';
+    }
+    if (sts_is_profane($name)) {
+        return 'name not allowed';
+    }
+    return null;
 }
