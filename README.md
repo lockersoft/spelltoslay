@@ -33,8 +33,13 @@ Run the test suite:
 
 ```bash
 vendor/bin/phpunit          # PHPUnit (API + core PHP)
-npx playwright test         # Playwright happy-path E2E
+npx playwright test         # Playwright E2E
 ```
+
+Playwright starts its own PHP server against a temporary SQLite file and the
+teacher key `e2e-key` (both passed as `STS_DB_PATH` / `STS_TEACHER_KEY`
+environment variables), so it never touches `data/` or `config/config.php`.
+Stop any dev server on port 8001 first.
 
 ## What's wired up
 

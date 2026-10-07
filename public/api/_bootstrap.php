@@ -1,15 +1,21 @@
 <?php
 declare(strict_types=1);
 
-// Detect test mode (constants defined by tests/bootstrap.php).
+// Settings precedence: PHP constant (PHPUnit bootstrap) > environment variable
+// (Playwright's throwaway server) > on-disk default (production).
+$envDb  = getenv('STS_DB_PATH');
+$envKey = getenv('STS_TEACHER_KEY');
+
 $dbPath = defined('STS_DB_PATH')
     ? STS_DB_PATH
-    : __DIR__ . '/../../data/spelltoslay.db';
+    : ($envDb ?: __DIR__ . '/../../data/spelltoslay.db');
 
 $config = ['teacher_key' => null];
 $configFile = __DIR__ . '/../../config/config.php';
 if (defined('STS_TEACHER_KEY')) {
     $config['teacher_key'] = STS_TEACHER_KEY;
+} elseif ($envKey) {
+    $config['teacher_key'] = $envKey;
 } elseif (file_exists($configFile)) {
     $config = array_merge($config, require $configFile);
 }
