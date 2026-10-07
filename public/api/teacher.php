@@ -95,12 +95,8 @@ switch ($action) {
             return;
         }
         $newName = trim((string)($body['name'] ?? ''));
-        if ($newName === '' || mb_strlen($newName) > 16 || !preg_match('/^[A-Za-z0-9 ]{1,16}$/', $newName)) {
-            sts_json(400, ['error' => 'name must be 1–16 alphanumeric characters (with spaces)']);
-            return;
-        }
-        if (sts_is_profane($newName)) {
-            sts_json(400, ['error' => 'name not allowed']);
+        if (($nameError = sts_name_error($newName)) !== null) {
+            sts_json(400, ['error' => $nameError]);
             return;
         }
         $stmt = $db->prepare('UPDATE presence SET name = :name WHERE client_id = :cid');

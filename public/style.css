@@ -74,6 +74,8 @@ html, body {
   cursor: pointer; border: none;
 }
 .error { color: var(--danger); }
+/* The name modal can open on top of the game-over modal (Change name). */
+#name-entry { z-index: 20; }
 
 .footer-row {
   display: flex; align-items: center; gap: 8px;

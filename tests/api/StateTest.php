@@ -214,4 +214,33 @@ class StateTest extends TestCase
         [, , $json] = sts_invoke('state.php');
         $this->assertSame(0, $json['forceReloadAt']);
     }
+
+    public function test_state_does_not_store_profane_name(): void
+    {
+        [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'uuid-prof', 'name' => 'shithead']);
+        $row = sts_db()->query("SELECT name FROM presence WHERE client_id='uuid-prof'")->fetch();
+        $this->assertNotFalse($row);            // presence is still recorded
+        $this->assertNull($row['name']);        // but without the name
+        $this->assertTrue($json['nameRejected']);
+        $this->assertSame('', $json['name']);
+    }
+
+    public function test_state_clears_a_profane_name_stored_before_the_rule(): void
+    {
+        sts_db()->exec("INSERT INTO presence (client_id, last_seen, name) VALUES ('uuid-old', " . time() . ", 'shithead')");
+        [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'uuid-old', 'name' => 'shithead']);
+        $row = sts_db()->query("SELECT name FROM presence WHERE client_id='uuid-old'")->fetch();
+        $this->assertNull($row['name']);
+        $this->assertSame('', $json['name']);
+        $this->assertTrue($json['nameRejected']);
+    }
+
+    public function test_state_does_not_flag_a_clean_or_absent_name(): void
+    {
+        [, , $a] = sts_invoke('state.php', 'GET', ['cid' => 'uuid-ok', 'name' => 'Ava']);
+        [, , $b] = sts_invoke('state.php', 'GET', ['cid' => 'uuid-none']);
+        $this->assertFalse($a['nameRejected']);
+        $this->assertFalse($b['nameRejected']);
+        $this->assertSame('Ava', $a['name']);
+    }
 }

@@ -83,13 +83,40 @@ function sts_json(int $status, array|string $body): void {
 function sts_now(): int { return time(); }
 
 /**
- * Shared profanity wordlist. Returns true if the name contains a banned word.
+ * Shared name profanity check.
+ *
+ * Two lists, because substring matching alone blocks innocent names
+ * ("Dickens", "Cassie"): strong words are matched anywhere, including across
+ * spaces ("f u c k"); the rest only as a whole space-separated word. Common
+ * digit-for-letter swaps are normalised first ("sh1t", "a55").
  */
 function sts_is_profane(string $name): bool {
-    static $bannedWords = ['shit','fuck','bitch','cunt','asshole','damn','dick'];
-    $lc = strtolower($name);
-    foreach ($bannedWords as $w) {
-        if (str_contains($lc, $w)) return true;
+    static $anywhere = ['fuck','shit','bitch','cunt','asshole','nigger','nigga','faggot',
+                        'whore','slut','pussy','penis','vagina'];
+    static $wholeWord = ['ass','arse','damn','dick','cock','piss','crap','fag','tit','tits',
+                         'sex','porn','hoe','wtf','stfu','poop','butt'];
+
+    $norm = strtr(strtolower($name), ['0' => 'o', '1' => 'i', '3' => 'e', '4' => 'a', '5' => 's', '7' => 't']);
+    $joined = preg_replace('/[^a-z]/', '', $norm);
+    foreach ($anywhere as $w) {
+        if (str_contains($joined, $w)) return true;
+    }
+    foreach (preg_split('/[^a-z]+/', $norm, -1, PREG_SPLIT_NO_EMPTY) as $token) {
+        if (in_array($token, $wholeWord, true)) return true;
     }
     return false;
+}
+
+/**
+ * One rule for every place a player name enters the system.
+ * Returns null when acceptable, otherwise the message to show the user.
+ */
+function sts_name_error(string $name): ?string {
+    if (!preg_match('/^[A-Za-z0-9 ]{1,16}$/', $name)) {
+        return 'name must be 1–16 letters, numbers, or spaces';
+    }
+    if (sts_is_profane($name)) {
+        return 'name not allowed';
+    }
+    return null;
 }

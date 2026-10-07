@@ -18,12 +18,8 @@ $accuracy   = $body['accuracy']   ?? 0;
 $wordsSlain = $body['wordsSlain'] ?? 0;
 
 // Validation.
-if ($name === '' || mb_strlen($name) > 16) {
-    sts_json(400, ['error' => 'name must be 1–16 characters']);
-    return;
-}
-if (!preg_match('/^[A-Za-z0-9 ]+$/', $name)) {
-    sts_json(400, ['error' => 'name must be alphanumeric (with spaces)']);
+if (($nameError = sts_name_error($name)) !== null) {
+    sts_json(400, ['error' => $nameError]);
     return;
 }
 foreach (['score' => $score, 'wave' => $wave, 'duration' => $duration] as $f => $v) {
@@ -45,11 +41,6 @@ if ($duration > 7200)     { sts_json(400, ['error' => 'duration implausible']); 
 if ($wpm > 200)           { sts_json(400, ['error' => 'wpm implausible']);        return; }
 if ($accuracy > 100)      { sts_json(400, ['error' => 'accuracy implausible']);   return; }
 if ($wordsSlain > 5000)   { sts_json(400, ['error' => 'wordsSlain implausible']); return; }
-
-// Profanity check (shared wordlist in _bootstrap.php).
-if (sts_is_profane($name)) {
-    sts_json(400, ['error' => 'name not allowed']); return;
-}
 
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 

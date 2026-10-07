@@ -101,29 +101,111 @@ const entryNameInput = document.getElementById('entry-name');
 const startPlayingBtn = document.getElementById('start-playing');
 const entryErrorEl  = document.getElementById('entry-error');
 
-if (!state.playerName) {
+const nameTitleEl   = document.getElementById('name-entry-title');
+const cancelNameBtn = document.getElementById('cancel-name');
+let nameModalMode = 'first';   // 'first' = welcome screen, 'change' = from game over
+
+function openNameModal(mode) {
+  nameModalMode = mode;
+  nameTitleEl.textContent = mode === 'first' ? 'Welcome to SpellToSlay' : 'Change your name';
+  startPlayingBtn.textContent = mode === 'first' ? 'Start playing' : 'Save name';
+  cancelNameBtn.classList.toggle('hidden', mode === 'first');
+  entryNameInput.value = mode === 'first' ? '' : state.playerName;
+  entryErrorEl.classList.add('hidden');
   nameEntryEl.classList.remove('hidden');
-  entryNameInput.value = '';
-  state.running = false; // pause the engine until they submit
-} else {
-  // Already named on a prior visit; just go.
-  nameEntryEl.classList.add('hidden');
+  entryNameInput.focus();
 }
 
-startPlayingBtn.addEventListener('click', () => {
+function showNameError(msg) {
+  entryErrorEl.textContent = msg;
+  entryErrorEl.classList.remove('hidden');
+}
+
+let nameSavePending = false;
+async function submitName() {
+  if (nameSavePending) return;
   const v = entryNameInput.value.trim();
   if (!/^[A-Za-z0-9 ]{1,16}$/.test(v)) {
-    entryErrorEl.textContent = 'Name must be 1–16 letters, numbers, or spaces.';
-    entryErrorEl.classList.remove('hidden');
+    showNameError('Name must be 1–16 letters, numbers, or spaces.');
     return;
   }
+  // The server owns the "is this name allowed" rule.
+  nameSavePending = true;
+  startPlayingBtn.disabled = true;
+  cancelNameBtn.disabled = true;
+  let status = 0;   // 0 = server not reached
+  let error = '';
+  try {
+    const r = await fetch('/api/rename.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cid: state.clientId, name: v }),
+    });
+    status = r.status;
+    if (!r.ok) error = (await r.json().catch(() => ({}))).error || '';
+  } catch (_) {
+    /* offline */
+  } finally {
+    nameSavePending = false;
+    startPlayingBtn.disabled = false;
+    cancelNameBtn.disabled = false;
+  }
+
+  if (status === 400) {
+    showNameError(error === 'name not allowed'
+      ? 'That name is not allowed. Please pick another.'
+      : 'Name must be 1–16 letters, numbers, or spaces.');
+    return;
+  }
+  // A first-time player may start even if the server could not be reached
+  // (score submission re-checks the name). An existing player's rename must
+  // really have been saved, or the next poll would silently undo it.
+  if (nameModalMode === 'change' && status !== 200) {
+    showNameError('Could not save the name. Try again.');
+    return;
+  }
+
   state.playerName = v;
   localStorage.setItem('sts_player_name', v);
   nameEntryEl.classList.add('hidden');
   entryErrorEl.classList.add('hidden');
-  state.running = true;
-  typeInput.focus();
+  if (nameModalMode === 'first') {
+    state.running = true;
+    typeInput.focus();
+  } else {
+    goNameEl.textContent = v;
+  }
+}
+
+// The server refused the name this browser has saved (it predates the current
+// rules, or was typed while offline): forget it and ask again.
+function forgetRejectedName() {
+  state.playerName = '';
+  localStorage.removeItem('sts_player_name');
+  state.running = false;
+  if (nameEntryEl.classList.contains('hidden') || nameModalMode !== 'first') {
+    openNameModal('first');
+    showNameError('That name is not allowed. Please pick another.');
+  }
+}
+
+startPlayingBtn.addEventListener('click', submitName);
+entryNameInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') { ev.preventDefault(); submitName(); }
 });
+cancelNameBtn.addEventListener('click', () => nameEntryEl.classList.add('hidden'));
+document.getElementById('change-name').addEventListener('click', (ev) => {
+  ev.preventDefault();
+  openNameModal('change');
+});
+
+if (!state.playerName) {
+  openNameModal('first');
+  state.running = false; // engine stays idle until they submit
+} else {
+  // Already named on a prior visit; just go.
+  nameEntryEl.classList.add('hidden');
+}
 
 // ─── Word pool ───────────────────────────────────────
 let prefixIndex = new Map(); // prefix(string) → Set<enemyId>
@@ -537,7 +619,9 @@ async function pollServerState() {
   state.paused          = !!s.paused;
   state.personalPaused  = !!s.personalPaused;
   state.messageBar      = (s.message || '') + (s.personalMessage ? '  •  ' + s.personalMessage : '');
-  if (s.name && s.name !== state.playerName) {
+  if (s.nameRejected && state.playerName) {
+    forgetRejectedName();
+  } else if (s.name && s.name !== state.playerName) {
     state.playerName = s.name;
     localStorage.setItem('sts_player_name', s.name);
   }

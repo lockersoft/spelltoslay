@@ -27,7 +27,10 @@ if ($pushWord !== '' && ((int)$row['push_word_set_at'] !== 0)
 // ── Input validation ────────────────────────────────────────────────────────
 $cid       = (string)($_GET['cid'] ?? '');
 $nameParam = (string)($_GET['name'] ?? '');
-$validName = preg_match('/^[A-Za-z0-9 ]{1,16}$/', $nameParam) ? $nameParam : '';
+$validName = sts_name_error($nameParam) === null ? $nameParam : '';
+// Tell the client when the name it is carrying is not acceptable, so it can
+// ask for another instead of playing on under a name the server ignores.
+$nameRejected = $nameParam !== '' && $validName === '';
 
 // Optional live-stat params (Feature 1 & 2).
 if (!function_exists('parse_nonneg_int')) {
@@ -50,6 +53,12 @@ if ($cid !== '' && preg_match('/^[A-Za-z0-9\-]{1,64}$/', $cid)) {
     $cur = $db->prepare('SELECT name, current_score, current_wave, current_hp, is_playing, is_visible FROM presence WHERE client_id = :cid');
     $cur->execute([':cid' => $cid]);
     $curRow = $cur->fetch();
+
+    // A name stored before the current rules existed may no longer pass them.
+    if ($curRow !== false && (string)($curRow['name'] ?? '') !== ''
+        && sts_name_error((string)$curRow['name']) !== null) {
+        $db->prepare('UPDATE presence SET name = NULL WHERE client_id = :cid')->execute([':cid' => $cid]);
+    }
 
     $upsertScore   = ($scoreParam   === -1) ? (int)($curRow['current_score'] ?? 0) : $scoreParam;
     $upsertWave    = ($waveParam    === -1) ? (int)($curRow['current_wave']  ?? 1) : $waveParam;
@@ -135,6 +144,7 @@ $payload = [
     'personalMessage' => $personalMessage,
     'personalPaused'  => $personalPaused,
     'name'            => $authName,
+    'nameRejected'    => $nameRejected,
     'pollId'          => $pollId,
     'pollQuestion'    => $pollQuestion !== '' ? $pollQuestion : null,
     'pollOptions'     => $pollQuestion !== '' ? $pollOptions : null,
