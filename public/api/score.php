@@ -42,6 +42,21 @@ if ($wpm > 200)           { sts_json(400, ['error' => 'wpm implausible']);      
 if ($accuracy > 100)      { sts_json(400, ['error' => 'accuracy implausible']);   return; }
 if ($wordsSlain > 5000)   { sts_json(400, ['error' => 'wordsSlain implausible']); return; }
 
+// Cross-field checks. The run's numbers have to agree with each other; these
+// bounds mirror the client's rules (WAVE_DURATION_S = 30, longest word 32
+// letters, largest pointMultiplier 4, streak bonus capped at 2.0). If a
+// student contribution raises any of those, raise the matching bound here.
+// (Plain variables, not `const`: the test harness requires this file many
+// times per process and a constant would be redeclared.)
+$maxPointsPerWord = 32 * 4 * 2;
+$waveSeconds      = 30;
+if ($score > $wordsSlain * $maxPointsPerWord
+    || $wave > intdiv($duration, $waveSeconds) + 2
+    || $wordsSlain > $duration * 3 + 5) {
+    sts_json(400, ['error' => 'score does not match the run']);
+    return;
+}
+
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 // Rate limit: 1 submission per (IP, name) per 10s.
@@ -76,7 +91,9 @@ $ins->execute([
     ':ts'       => sts_now(),
 ]);
 
-$rank   = (int)$db->query("SELECT COUNT(*) AS c FROM scores WHERE score > $score")->fetch()['c'] + 1;
+$rankStmt = $db->prepare('SELECT COUNT(*) AS c FROM scores WHERE score > :s');
+$rankStmt->execute([':s' => $score]);
+$rank   = (int)$rankStmt->fetch()['c'] + 1;
 $topRow = $db->query('SELECT MAX(score) AS top FROM scores')->fetch();
 $top    = (int)($topRow['top'] ?? 0);
 

@@ -5,6 +5,10 @@ const ARENA = { w: 960, h: 600 };
 const HERO  = { emoji: '🛡️', size: 36 };
 const MAX_HP = 100;
 const TYPO_HP_PENALTY = 1;
+// NOTE: public/api/score.php cross-checks submitted runs against
+// WAVE_DURATION_S, the 32-letter word cap and the largest pointMultiplier
+// below. Change them here and the server will start rejecting honest scores
+// until its bounds are raised too.
 const WAVE_DURATION_S = 30;
 const BOSS_WAVE_INTERVAL = 5;
 const WPM_WINDOW_S = 30;
