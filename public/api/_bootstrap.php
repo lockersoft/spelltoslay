@@ -94,6 +94,22 @@ function sts_json(int $status, array|string $body): void {
 function sts_now(): int { return time(); }
 
 /**
+ * Gate for teacher-only endpoints. Emits the 403 itself; callers just return.
+ * The key travels in the X-Teacher-Key header so it stays out of URLs, browser
+ * history and access logs; ?key= is still honoured for curl and old bookmarks.
+ * When the header is present it is the only thing checked.
+ */
+function sts_require_teacher(): bool {
+    $expected = sts_config()['teacher_key'] ?? null;
+    $provided = $_SERVER['HTTP_X_TEACHER_KEY'] ?? ($_GET['key'] ?? '');
+    if (!$expected || !is_string($provided) || !hash_equals((string)$expected, $provided)) {
+        sts_json(403, ['error' => 'forbidden']);
+        return false;
+    }
+    return true;
+}
+
+/**
  * Shared name profanity check.
  *
  * Two lists, because substring matching alone blocks innocent names

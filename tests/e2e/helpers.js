@@ -25,7 +25,9 @@ export async function seedEnemies(page, seeds) {
 }
 
 export async function teacher(request, payload) {
-  const r = await request.post('/api/teacher.php?key=e2e-key', { data: payload });
+  const r = await request.post('/api/teacher.php', {
+    data: payload, headers: { 'X-Teacher-Key': 'e2e-key' },
+  });
   if (!r.ok()) throw new Error(`teacher action failed: ${r.status()}`);
   return r.json();
 }
