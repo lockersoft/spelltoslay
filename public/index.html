@@ -11,18 +11,11 @@
   <main id="game-root">
     <header class="topbar">
       <h1>SpellToSlay</h1>
-      <div class="hud" id="hud">
-        <span id="hud-hp"></span>
-        <span id="hud-score"></span>
-        <span id="hud-wave"></span>
-        <span id="hud-time"></span>
-      </div>
+      <div class="hud" id="hud"></div>
     </header>
 
     <div class="stage">
       <canvas id="arena" width="960" height="600"></canvas>
-
-      <div id="overlay" class="overlay hidden" aria-live="polite"></div>
 
       <!-- Feature 12: Poll overlay (non-blocking, stays over game) -->
       <div id="poll-overlay" class="poll-overlay hidden">
@@ -51,7 +44,7 @@
       <div id="leaderboard" class="modal hidden">
         <h2>Leaderboard</h2>
         <p id="rank-summary"></p>
-        <h3>Today</h3>
+        <h3>Last 24 hours</h3>
         <ol id="lb-today"></ol>
         <h3>All time</h3>
         <ol id="lb-alltime"></ol>

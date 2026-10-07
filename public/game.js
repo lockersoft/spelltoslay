@@ -62,7 +62,7 @@ const state = {
   clientId: null,
   playerName: '',
   messageBar: '',
-  personalMessage: '',
+  labelRects: [],        // last frame's word-label rectangles (for tests)
   tabVisible: true,
   pollState: null,
   pollAnsweredAt: 0,
@@ -566,11 +566,9 @@ function currentAccuracy() {
   return Math.round(100 * state.keystrokes.correct / state.keystrokes.total);
 }
 
-function elapsedHHMMSS() {
+function elapsedMMSS() {
   const t = Math.floor(state.time);
-  const m = String(Math.floor(t / 60)).padStart(1, '0');
-  const s = String(t % 60).padStart(2, '0');
-  return `${m}:${s}`;
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
 typeInput.addEventListener('input', onType);
@@ -603,6 +601,12 @@ function shouldReload(s) {
   }
 }
 
+const messageBarEl = document.getElementById('message-bar');
+function applyMessages(classMessage, personalMessage) {
+  state.messageBar = [classMessage, personalMessage].filter(Boolean).join(' • ');
+  messageBarEl.textContent = state.messageBar;
+}
+
 async function pollServerState() {
   const params = new URLSearchParams({ cid: state.clientId });
   if (state.playerName) params.set('name', state.playerName);
@@ -622,7 +626,7 @@ async function pollServerState() {
 
   state.paused          = !!s.paused;
   state.personalPaused  = !!s.personalPaused;
-  state.messageBar      = (s.message || '') + (s.personalMessage ? '  •  ' + s.personalMessage : '');
+  applyMessages(s.message || '', s.personalMessage || '');
   if (s.nameRejected && state.playerName) {
     forgetRejectedName();
   } else if (s.name && s.name !== state.playerName) {
@@ -677,6 +681,7 @@ function updatePollOverlay(s) {
 
   if (!s.pollQuestion) {
     pollEl.classList.add('hidden');
+    document.getElementById('poll-options').dataset.renderKey = '';
     state.pollState = null;
     state.pollAnsweredAt = 0;
     return;
@@ -706,9 +711,9 @@ function updatePollOverlay(s) {
   pollEl.classList.remove('hidden');
   document.getElementById('poll-question').textContent = s.pollQuestion;
   const btnsEl = document.getElementById('poll-options');
-  btnsEl.innerHTML = '';
+  const answered = myAnswer !== null && myAnswer !== undefined;
 
-  if (myAnswer !== null && myAnswer !== undefined) {
+  if (answered) {
     // Already answered — show confirmed state with countdown to dismiss.
     const remaining = Math.max(0, Math.ceil(
       (POLL_DISMISS_AFTER_MS - (Date.now() - state.pollAnsweredAt)) / 1000
@@ -720,31 +725,36 @@ function updatePollOverlay(s) {
     const fade = document.createElement('p');
     fade.textContent = remaining > 0 ? `(closing in ${remaining}s)` : '';
     fade.style.cssText = 'margin: 4px 0 0; font-size: 12px; color: #6e7681;';
-    btnsEl.appendChild(thanks);
-    btnsEl.appendChild(fade);
-  } else {
-    // Not yet answered — show option buttons.
-    options.forEach((opt, i) => {
-      const btn = document.createElement('button');
-      btn.textContent = opt;
-      btn.addEventListener('click', async () => {
-        try {
-          await fetch('/api/poll-vote.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cid: state.clientId, pollId, optionIndex: i }),
-          });
-          if (state.pollState) state.pollState.myAnswer = i;
-          state.pollAnsweredAt = Date.now();
-          // Re-render in answered state immediately (don't wait for next poll).
-          updatePollOverlay({ ...s, pollMyAnswer: i });
-          // Schedule a hide so the user doesn't have to wait for a poll cycle.
-          setTimeout(() => pollEl.classList.add('hidden'), POLL_DISMISS_AFTER_MS);
-        } catch (_) {}
-      });
-      btnsEl.appendChild(btn);
-    });
+    btnsEl.replaceChildren(thanks, fade);
+    btnsEl.dataset.renderKey = '';
+    return;
   }
+
+  // Unanswered: rebuilding the buttons on every 2s poll can swallow a click
+  // that lands mid-rebuild, so only rebuild when the poll itself changed.
+  const renderKey = `${pollId}:${JSON.stringify(options)}`;
+  if (btnsEl.dataset.renderKey === renderKey) return;
+  btnsEl.dataset.renderKey = renderKey;
+  btnsEl.replaceChildren(...options.map((opt, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = opt;
+    btn.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/poll-vote.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cid: state.clientId, pollId, optionIndex: i }),
+        });
+        if (!r.ok) return;   // leave the buttons up so the student can retry
+        state.pollAnsweredAt = Date.now();
+        // Re-render in answered state immediately (don't wait for next poll).
+        updatePollOverlay({ ...s, pollMyAnswer: i });
+        // Schedule a hide so the user doesn't have to wait for a poll cycle.
+        setTimeout(() => pollEl.classList.add('hidden'), POLL_DISMISS_AFTER_MS);
+      } catch (_) { /* network error: buttons stay */ }
+    });
+    return btn;
+  }));
 }
 
 // ─── Effect drawing helpers ──────────────────────────
@@ -793,6 +803,32 @@ function drawRing(fx, p) {
   ctx.stroke();
 }
 
+// ─── Label layout ────────────────────────────────────
+// Place word labels so every pill is fully inside the arena and pills do not
+// cover each other. Pure function: no canvas, no state. `items` are ordered
+// most-important first; earlier items keep their wanted spot and later ones
+// move (up first, then down) out of the way.
+function layoutLabels(items, arena) {
+  const placed = [];
+  const clampAxis = (c, size, max) =>
+    size >= max ? max / 2 : Math.min(Math.max(c, size / 2), max - size / 2);
+  const hits = (a, b) => Math.abs(a.cx - b.cx) < (a.w + b.w) / 2
+                      && Math.abs(a.cy - b.cy) < (a.h + b.h) / 2;
+  for (const it of items) {
+    const r = { id: it.id, w: it.w, h: it.h,
+                cx: clampAxis(it.x, it.w, arena.w),
+                cy: clampAxis(it.y, it.h, arena.h) };
+    const homeY = r.cy;
+    for (let n = 1; n <= 8 && placed.some(p => hits(p, r)); n++) {
+      // Alternate above/below the wanted row: -1, +1, -2, +2, ...
+      const step = Math.ceil(n / 2) * (n % 2 === 1 ? -1 : 1);
+      r.cy = clampAxis(homeY + step * (it.h + 2), it.h, arena.h);
+    }
+    placed.push(r);
+  }
+  return placed;
+}
+
 // ─── Render ──────────────────────────────────────────
 function render() {
   if (state.typedBuffer !== '') refreshLock();
@@ -802,6 +838,7 @@ function render() {
   ctx.fillRect(0, 0, ARENA.w, ARENA.h);
 
   // Hero
+  ctx.fillStyle = '#fff';
   ctx.font = `${HERO.size}px serif`;
   ctx.fillText(HERO.emoji, state.hero.x, state.hero.y);
 
@@ -826,30 +863,45 @@ function render() {
       ctx.arc(e.x, e.y, e.def.size * 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
 
-    // Word above the enemy — only for live enemies.
-    if (!e.dying) {
-      // Font + pill scale uniformly from state.wordFontSize (user-adjustable).
-      // The 14/12/22 base values come from the original v1 design at 14 px font.
-      const fs = state.wordFontSize;
-      const sc = fs / 14;
-      ctx.font = `${fs}px ui-monospace, monospace`;
-      const word = e.word;
+  // Word labels. Laid out together so they stay inside the arena and do not
+  // cover one another; the enemy nearest the hero gets first pick of position.
+  // Font + pill scale uniformly from state.wordFontSize (user-adjustable).
+  // The 14/22 base values come from the original v1 design at 14 px font.
+  {
+    const fs = state.wordFontSize;
+    const sc = fs / 14;
+    const padding = 6;
+    ctx.font = `${fs}px ui-monospace, monospace`;
+    const live = state.enemies.filter(e => !e.dying)
+      .map(e => ({ e, d: Math.hypot(e.x - state.hero.x, e.y - state.hero.y) }))
+      .sort((a, b) => a.d - b.d)
+      .map(o => o.e);
+    const items = live.map(e => ({
+      id: e.id,
+      x: e.x,
+      y: e.y - e.def.size / 2 - 8 - sc,     // pill centre; the text row sits 1*sc below it
+      w: ctx.measureText(e.word).width + padding * 2,
+      h: 22 * sc,
+    }));
+    const rects = layoutLabels(items, ARENA);
+    state.labelRects = rects;               // read by tests; nothing else uses it
+    live.forEach((e, i) => {
+      const r = rects[i];
       const n = typedLenFor(e);
-      const typed = word.slice(0, n);
-      const rest  = word.slice(n);
-      const wY = e.y - e.def.size / 2 - 8;
-      // Background pill
-      const padding = 6, w = ctx.measureText(word).width;
+      const typed = e.word.slice(0, n);
+      const rest  = e.word.slice(n);
+      const left  = r.cx - (r.w - padding * 2) / 2;
+      const textY = r.cy + sc;
       ctx.fillStyle = '#1a2238';
-      ctx.fillRect(e.x - w/2 - padding, wY - 12 * sc, w + padding*2, 22 * sc);
-      // Typed (green)
+      ctx.fillRect(r.cx - r.w / 2, r.cy - r.h / 2, r.w, r.h);
+      const typedW = ctx.measureText(typed).width;
       ctx.fillStyle = '#06d6a0';
-      ctx.fillText(typed, e.x - w/2 + ctx.measureText(typed).width/2, wY);
-      // Untyped (white)
+      ctx.fillText(typed, left + typedW / 2, textY);
       ctx.fillStyle = '#cde';
-      ctx.fillText(rest, e.x - w/2 + ctx.measureText(typed).width + ctx.measureText(rest).width/2, wY);
-    }
+      ctx.fillText(rest, left + typedW + ctx.measureText(rest).width / 2, textY);
+    });
   }
 
   // Effects (orbs, rings). Drawn after enemies so they sit above the play
@@ -886,7 +938,7 @@ function render() {
 
   // Top-right: score, time
   const pSc   = pill(`SCORE ${state.score}`, '#fff');
-  const pTm   = pill(`TIME ${elapsedHHMMSS()}`, '#fff');
+  const pTm   = pill(`TIME ${elapsedMMSS()}`, '#fff');
   pSc.draw(ARENA.w - pSc.w - 8, 8);
   pTm.draw(ARENA.w - pTm.w - 8, 30);
 
@@ -897,14 +949,6 @@ function render() {
   pWp.draw(ARENA.w - pWp.w - 8, ARENA.h - 70);
   pAc.draw(ARENA.w - pAc.w - 8, ARENA.h - 48);
   pSt.draw(ARENA.w - pSt.w - 8, ARENA.h - 26);
-
-  // Top-center: teacher message strip (only when message set)
-  if (state.messageBar) {
-    ctx.font = '11px ui-monospace, monospace';
-    ctx.fillStyle = '#ffd166';
-    ctx.textAlign = 'center';
-    ctx.fillText(`📣 ${state.messageBar}`, ARENA.w / 2, 14);
-  }
 
   // Pause overlay
   if (state.paused || state.personalPaused) {
@@ -985,7 +1029,7 @@ function showGameOver() {
   if (gameOverShown) return;
   gameOverShown = true;
   goSummaryEl.textContent =
-    `Score ${state.score} · ${state.kills} words · WPM ${currentWpm()} · ACC ${currentAccuracy()}% · time ${elapsedHHMMSS()}`;
+    `Score ${state.score} · ${state.kills} words · WPM ${currentWpm()} · ACC ${currentAccuracy()}% · time ${elapsedMMSS()}`;
   goNameEl.textContent = state.playerName;
   submitErrorEl.classList.add('hidden');
   submitScoreBtn.disabled = false;
@@ -1037,9 +1081,17 @@ async function renderLeaderboard() {
   try {
     const r = await fetch('/api/leaderboard.php', { cache: 'no-store' });
     const j = await r.json();
-    const fmt = e => `<li><b>${e.name}</b> — ${e.score} (W${e.wave}, WPM ${e.wpm}, ${e.accuracy}%)</li>`;
-    lbTodayEl.innerHTML   = (j.today   || []).map(fmt).join('');
-    lbAlltimeEl.innerHTML = (j.allTime || []).map(fmt).join('');
+    const fill = (ol, rows) => {
+      ol.replaceChildren(...(rows || []).map((e) => {
+        const li = document.createElement('li');
+        const b = document.createElement('b');
+        b.textContent = e.name;
+        li.append(b, ` — ${e.score} (W${e.wave}, WPM ${e.wpm}, ${e.accuracy}%)`);
+        return li;
+      }));
+    };
+    fill(lbTodayEl, j.today);
+    fill(lbAlltimeEl, j.allTime);
   } catch (_) { /* ignore */ }
 }
 

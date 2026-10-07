@@ -1,5 +1,6 @@
 <?php
-// Copy this to /var/www/slay/shared/config/config.php on the server.
+// Copy this to config/config.php (gitignored). On the server that is
+// ~/spelltoslay-app/config/config.php.
 // Generate a real key with: php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'
 
 return [

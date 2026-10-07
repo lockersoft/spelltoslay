@@ -28,7 +28,7 @@ if ($source === 'teacher') {
     return;
 }
 
-if (preg_match('/^builtin:([K0-8]|[1-8])$/', $source, $m)) {
+if (preg_match('/^builtin:(K|[1-8])$/', $source, $m)) {
     $grade = $m[1];
     $path = __DIR__ . "/../words/grade-$grade.json";
     if (!is_file($path)) {
