@@ -92,6 +92,8 @@ test('spawner avoids a word that is already on screen', async ({ page }) => {
   await boot(page);
   await seedEnemies(page, [{ id: 'cat', word: 'cat', x: 200, y: 200 }]);
   const picks = await page.evaluate(() => {
+    // A word pushed by an earlier spec may still be queued (10s server TTL).
+    window.state.pushWordPending = '';
     window.state.wordPool = ['cat', 'dog'];
     const def = { difficultyClass: 'easy' };
     return Array.from({ length: 40 }, () => window.pickWordFor(def));
@@ -107,6 +109,8 @@ test('spawner reaches outside the difficulty bucket before repeating a word', as
     { id: 'sun', word: 'sun', x: 400, y: 200 },
   ]);
   const picks = await page.evaluate(() => {
+    // A word pushed by an earlier spec may still be queued (10s server TTL).
+    window.state.pushWordPending = '';
     window.state.wordPool = ['cat', 'dog', 'sun', 'elephant'];
     const def = { difficultyClass: 'easy' };
     return Array.from({ length: 40 }, () => window.pickWordFor(def));
@@ -118,6 +122,8 @@ test('spawner still returns a word when every pool word is on screen', async ({ 
   await boot(page);
   await seedEnemies(page, [{ id: 'cat', word: 'cat', x: 200, y: 200 }]);
   const pick = await page.evaluate(() => {
+    // A word pushed by an earlier spec may still be queued (10s server TTL).
+    window.state.pushWordPending = '';
     window.state.wordPool = ['cat'];
     return window.pickWordFor({ difficultyClass: 'easy' });
   });
