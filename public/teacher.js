@@ -1,4 +1,4 @@
-'use strict';
+import { postJson } from './js/api.js';
 
 const url = new URL(location.href);
 let key = url.searchParams.get('key') || sessionStorage.getItem('sts_teacher_key') || '';
@@ -23,11 +23,7 @@ function showError(msg) {
 }
 
 async function action(payload) {
-  const r = await fetch(`/api/teacher.php?key=${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const r = await postJson(`/api/teacher.php?key=${encodeURIComponent(key)}`, payload);
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
     showError(j.error || `HTTP ${r.status}`);

@@ -1,5 +1,6 @@
 import { MAX_HP } from './constants.js';
 import { state } from './state.js';
+import { postJson } from './api.js';
 import { typeInput, wordSizeSlider } from './dom.js';
 import { clearPrefixIndex } from './words.js';
 import { currentWpm, currentAccuracy, elapsedMMSS } from './typing.js';
@@ -56,11 +57,7 @@ async function submitName() {
   let status = 0;   // 0 = server not reached
   let error = '';
   try {
-    const r = await fetch('/api/rename.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cid: state.clientId, name: v }),
-    });
+    const r = await postJson('/api/rename.php', { cid: state.clientId, name: v });
     status = r.status;
     if (!r.ok) error = (await r.json().catch(() => ({}))).error || '';
   } catch (_) {
@@ -164,10 +161,7 @@ submitScoreBtn.addEventListener('click', async () => {
   skipSubmitBtn.disabled = true;
   submitErrorEl.classList.add('hidden');
   try {
-    const r = await fetch('/api/score.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const r = await postJson('/api/score.php', {
         name: state.playerName,
         score: state.score,
         wave: state.spawn.wave,
@@ -175,8 +169,7 @@ submitScoreBtn.addEventListener('click', async () => {
         wpm: currentWpm(),
         accuracy: currentAccuracy(),
         wordsSlain: state.kills,
-      }),
-    });
+      });
     const j = await r.json();
     if (!r.ok) {
       submitErrorEl.textContent = j.error || `HTTP ${r.status}`;

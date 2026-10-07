@@ -53,7 +53,18 @@ function sts_input_json(): array {
     $raw = sts_input_raw();
     if ($raw === '') return [];
     $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    if (!is_array($decoded)) return [];
+    // Clients send {"z": base64url(JSON object)} because DreamHost's
+    // mod_security reads request bodies and rejects free text that resembles
+    // SQL (a spelling list with "union" and "select" on adjacent lines is
+    // enough). A plain JSON body is still accepted, for curl and for clients
+    // loaded before this was deployed.
+    if (count($decoded) === 1 && isset($decoded['z']) && is_string($decoded['z'])) {
+        $json  = base64_decode(strtr($decoded['z'], '-_', '+/'), true);
+        $inner = ($json !== false && str_starts_with(ltrim($json), '{')) ? json_decode($json, true) : null;
+        return is_array($inner) ? $inner : [];
+    }
+    return $decoded;
 }
 
 /**

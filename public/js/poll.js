@@ -1,5 +1,6 @@
 import { POLL_DISMISS_AFTER_MS } from './constants.js';
 import { state } from './state.js';
+import { postJson } from './api.js';
 
 // ─── Poll overlay ────────────────────────────────────
 // The overlay sits on top of the canvas, so we auto-dismiss it 15 seconds
@@ -70,11 +71,7 @@ export function updatePollOverlay(s) {
     btn.textContent = opt;
     btn.addEventListener('click', async () => {
       try {
-        const r = await fetch('/api/poll-vote.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cid: state.clientId, pollId, optionIndex: i }),
-        });
+        const r = await postJson('/api/poll-vote.php', { cid: state.clientId, pollId, optionIndex: i });
         if (!r.ok) return;   // leave the buttons up so the student can retry
         state.pollAnsweredAt = Date.now();
         // Re-render in answered state immediately (don't wait for next poll).

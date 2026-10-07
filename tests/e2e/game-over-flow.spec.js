@@ -59,3 +59,15 @@ test('the red "stalled" input style does not survive into the next game', async 
   await expect(page.locator('#type-input')).not.toHaveClass(/stalled/);
   await expect(page.locator('#type-input')).toHaveValue('');
 });
+
+test('score is posted in the encoded form', async ({ page }) => {
+  await boot(page, 'Enc');
+  await die(page);
+  const [req] = await Promise.all([
+    page.waitForRequest('**/api/score.php'),
+    page.locator('#submit-score').click(),
+  ]);
+  const body = JSON.parse(req.postData());
+  expect(Object.keys(body)).toEqual(['z']);
+  await expect(page.locator('#leaderboard')).toBeVisible();
+});
