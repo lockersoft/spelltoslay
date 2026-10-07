@@ -62,7 +62,6 @@ const state = {
   tabVisible: true,
   pollState: null,
   pollAnsweredAt: 0,
-  forceReloadHandled: false,
 };
 
 if (typeof window !== 'undefined') window.state = state;
@@ -509,6 +508,26 @@ typeInput.addEventListener('blur',  () => setTimeout(() => {
 window.addEventListener('load',     () => { if (state.running) typeInput.focus(); });
 
 // ─── Polling ─────────────────────────────────────────
+// A reload broadcast stays visible in /api/state.php for 10 seconds, and the
+// page we reload INTO polls inside that window. Remember which broadcast this
+// tab already obeyed. sessionStorage survives the reload; where it is blocked,
+// fall back to "only obey broadcasts issued after this page first heard from
+// the server". (Two broadcasts in the same second count as one.)
+const RELOAD_KEY = 'sts_reload_handled';
+let bootServerTime = 0;
+function shouldReload(s) {
+  const at = s.forceReloadAt | 0;
+  if (!bootServerTime) bootServerTime = s.serverTime | 0;
+  if (!s.forceReload || !at) return false;
+  try {
+    if (sessionStorage.getItem(RELOAD_KEY) === String(at)) return false;
+    sessionStorage.setItem(RELOAD_KEY, String(at));
+    return true;
+  } catch (_) {
+    return at > bootServerTime;
+  }
+}
+
 async function pollServerState() {
   const params = new URLSearchParams({ cid: state.clientId });
   if (state.playerName) params.set('name', state.playerName);
@@ -534,8 +553,7 @@ async function pollServerState() {
     localStorage.setItem('sts_player_name', s.name);
   }
 
-  if (s.forceReload && !state.forceReloadHandled) {
-    state.forceReloadHandled = true;
+  if (shouldReload(s)) {
     location.reload();
     return;
   }

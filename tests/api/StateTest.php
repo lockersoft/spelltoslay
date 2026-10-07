@@ -197,4 +197,21 @@ class StateTest extends TestCase
         [, , $json] = sts_invoke('state.php', 'GET', ['cid' => 'test-cid-002']);
         $this->assertSame('', $json['pushWord']);
     }
+
+    public function test_force_reload_exposes_set_at_and_server_time(): void
+    {
+        $t = time() - 3;
+        sts_db()->exec("UPDATE state SET force_reload=1, force_reload_set_at=$t WHERE id=1");
+        [, , $json] = sts_invoke('state.php');
+        $this->assertSame($t, $json['forceReloadAt']);
+        $this->assertEqualsWithDelta(time(), $json['serverTime'], 2);
+    }
+
+    public function test_force_reload_at_is_zero_when_expired(): void
+    {
+        $t = time() - 30;
+        sts_db()->exec("UPDATE state SET force_reload=1, force_reload_set_at=$t WHERE id=1");
+        [, , $json] = sts_invoke('state.php');
+        $this->assertSame(0, $json['forceReloadAt']);
+    }
 }
