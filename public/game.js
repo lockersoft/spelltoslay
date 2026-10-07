@@ -160,6 +160,40 @@ function removeEnemyFromIndex(e) {
   }
 }
 
+// Closest enemy to the hero from a list (Euclidean). null for an empty list.
+function closestToHero(list) {
+  let best = null, bestDist = Infinity;
+  for (const e of list) {
+    const d = Math.hypot(e.x - state.hero.x, e.y - state.hero.y);
+    if (d < bestDist) { bestDist = d; best = e; }
+  }
+  return best;
+}
+
+// Live enemies whose word starts with the given prefix.
+function enemiesForPrefix(prefix) {
+  const ids = prefixIndex.get(prefix);
+  if (!ids) return [];
+  return state.enemies.filter(e => ids.has(e.id));
+}
+
+// The buffer can stop matching anything without the player touching a key:
+// the enemy they were typing walked into the hero. Left alone, every later
+// keystroke would be scored as a typo, so drop it.
+function dropOrphanedBuffer() {
+  if (state.typedBuffer === '' || prefixIndex.has(state.typedBuffer)) return;
+  state.typedBuffer = '';
+  state.lockedEnemyId = null;
+  typeInput.value = '';
+  typeInput.classList.remove('stalled');
+}
+
+// How many leading letters of this enemy's word to draw as "typed".
+function typedLenFor(e) {
+  const buf = state.typedBuffer;
+  return (!e.dying && buf !== '' && e.word.startsWith(buf)) ? buf.length : 0;
+}
+
 async function fetchWordPool() {
   try {
     const r = await fetch('/api/words.php', { cache: 'no-store' });
@@ -190,7 +224,15 @@ function pickWordFor(enemyDef) {
     return w.length >= 6 && w.length <= 7;
   });
   const source = matches.length >= 3 ? matches : pool;
-  return source[(Math.random() * source.length) | 0];
+  // Prefer a word no live enemy is already carrying: first within this
+  // difficulty bucket, then anywhere in the pool. Only when every pool word
+  // is on screen does a repeat spawn. (A teacher-pushed word, above, is
+  // spawned regardless.)
+  const live = new Set(state.enemies.filter(e => !e.dying).map(e => e.word));
+  const fresh = source.filter(w => !live.has(w));
+  const freshAnywhere = fresh.length > 0 ? fresh : pool.filter(w => !live.has(w));
+  const from = freshAnywhere.length > 0 ? freshAnywhere : source;
+  return from[(Math.random() * from.length) | 0];
 }
 
 function updateSpawner(dt) {
@@ -231,7 +273,6 @@ function spawnOne(def) {
     y:        -20,
     hp:       word.length,        // letter-by-letter damage
     word,
-    typedLen: 0,
   };
   state.enemies.push(e);
   addEnemyToIndex(e);
@@ -264,6 +305,7 @@ function updateEnemies(dt) {
     survivors.push(e);
   }
   state.enemies = survivors;
+  dropOrphanedBuffer();
 }
 
 // ─── Typing input ────────────────────────────────────
@@ -277,9 +319,12 @@ function onType() {
   const raw = typeInput.value.toLowerCase().replace(/[^a-z]/g, '');
   const prev = state.typedBuffer;
 
-  // Pure backspace? Just shrink the buffer.
+  // Buffer shrank (backspace, or the whole field cleared at once).
   if (raw.length < prev.length) {
-    state.typedBuffer = raw;
+    // Only keep what is still a real prefix; a paste-over could be anything.
+    state.typedBuffer = (raw === '' || prefixIndex.has(raw)) ? raw : '';
+    typeInput.value = state.typedBuffer;
+    typeInput.classList.remove('stalled');
     refreshLock();
     return;
   }
@@ -321,13 +366,7 @@ typeInput.addEventListener('keydown', (ev) => {
   if (!state.running || state.gameOver || state.paused || state.personalPaused) return;
   if (state.typedBuffer === '') return;
   ev.preventDefault();
-  const candidates = prefixIndex.get(state.typedBuffer);
-  if (!candidates) return;
-  const exact = [];
-  for (const id of candidates) {
-    const e = state.enemies.find(en => en.id === id);
-    if (e && e.word === state.typedBuffer) exact.push(e);
-  }
+  const exact = enemiesForPrefix(state.typedBuffer).filter(e => e.word === state.typedBuffer);
   if (exact.length === 0) {
     // Buffer isn't a complete word of any live enemy — premature commit = typo.
     state.hero.hp = Math.max(0, state.hero.hp - TYPO_HP_PENALTY);
@@ -337,96 +376,46 @@ typeInput.addEventListener('keydown', (ev) => {
     flashLockedRed();
     return;
   }
-  let best = exact[0];
-  let bestDist = Math.hypot(best.x - state.hero.x, best.y - state.hero.y);
-  for (let i = 1; i < exact.length; i++) {
-    const d = Math.hypot(exact[i].x - state.hero.x, exact[i].y - state.hero.y);
-    if (d < bestDist) { bestDist = d; best = exact[i]; }
-  }
-  state.lockedEnemyId = best.id;
-  best.typedLen = state.typedBuffer.length;
-  best.hp = 0;
-  onEnemySlain(best);
+  onEnemySlain(closestToHero(exact));
 });
 
 function refreshLock() {
-  if (state.typedBuffer === '') {
-    state.lockedEnemyId = null;
-    return;
-  }
-  const candidates = prefixIndex.get(state.typedBuffer);
-  if (!candidates || candidates.size === 0) {
-    state.lockedEnemyId = null;
-    return;
-  }
-  // Among matches, pick the one closest to the hero (Euclidean).
-  let bestId = null, bestDist = Infinity;
-  for (const id of candidates) {
-    const e = state.enemies.find(en => en.id === id);
-    if (!e) continue;
-    const d = Math.hypot(e.x - state.hero.x, e.y - state.hero.y);
-    if (d < bestDist) { bestDist = d; bestId = id; }
-  }
-  state.lockedEnemyId = bestId;
-  const locked = state.enemies.find(e => e.id === bestId);
-  if (locked) locked.typedLen = state.typedBuffer.length;
+  const best = closestToHero(enemiesForPrefix(state.typedBuffer));
+  state.lockedEnemyId = (state.typedBuffer !== '' && best) ? best.id : null;
 }
 
 // Decide what (if anything) to do after the buffer has been extended by one
 // valid keystroke. Damage is deferred while the prefix matches multiple live
-// enemies; once the lock disambiguates to a single enemy, damage equal to
-// buffer.length is applied (monotone — backspace doesn't heal). When the
-// buffer exactly matches a live enemy's word and no other live enemy could
-// extend the buffer further, the slay fires immediately.
+// enemies. When the buffer exactly matches at least one live enemy's word and
+// no live enemy could extend the buffer further, the closest exact match is
+// slain immediately (two enemies may carry the same word).
 function commitOrLock() {
   const buf = state.typedBuffer;
-  const candidates = prefixIndex.get(buf);
-  if (!candidates || candidates.size === 0) return;
+  const candidates = enemiesForPrefix(buf);
+  if (candidates.length === 0) return;
 
-  const exactMatches = [];
-  let extendingCount = 0;
-  for (const id of candidates) {
-    const e = state.enemies.find(en => en.id === id);
-    if (!e) continue;
-    if (e.word === buf) exactMatches.push(e);
-    else if (e.word.length > buf.length) extendingCount += 1;
-  }
+  const exact = candidates.filter(e => e.word === buf);
+  const extending = candidates.length - exact.length;
 
-  if (exactMatches.length === 1 && extendingCount === 0) {
-    const e = exactMatches[0];
-    state.lockedEnemyId = e.id;
-    e.typedLen = buf.length;
-    e.hp = 0;
-    onEnemySlain(e);
+  if (exact.length >= 1 && extending === 0) {
+    onEnemySlain(closestToHero(exact));
     return;
   }
 
-  if (candidates.size === 1) {
-    const id = [...candidates][0];
-    const e = state.enemies.find(en => en.id === id);
-    if (!e) return;
-    const target = e.word.length - buf.length;
-    if (target < e.hp) e.hp = target;
-    e.typedLen = buf.length;
+  if (candidates.length === 1) {
+    const e = candidates[0];
+    const remaining = e.word.length - buf.length;
+    if (remaining < e.hp) e.hp = remaining;   // monotone: backspace doesn't heal
     state.lockedEnemyId = e.id;
-    if (e.hp <= 0) onEnemySlain(e);
     return;
   }
 
-  // Ambiguous — no damage. Visual lock to closest among prefix-matchers.
-  let bestId = null, bestDist = Infinity;
-  for (const id of candidates) {
-    const e = state.enemies.find(en => en.id === id);
-    if (!e) continue;
-    const d = Math.hypot(e.x - state.hero.x, e.y - state.hero.y);
-    if (d < bestDist) { bestDist = d; bestId = id; }
-  }
-  state.lockedEnemyId = bestId;
-  const locked = state.enemies.find(e => e.id === bestId);
-  if (locked) locked.typedLen = buf.length;
+  // Ambiguous — no damage. Visual lock on the closest prefix-matcher.
+  state.lockedEnemyId = closestToHero(candidates).id;
 }
 
 function onEnemySlain(e) {
+  e.hp = 0;
   const word = e.word;
   // Score: floor(wordLength × pointMultiplier × streakBonus)
   const streakBonus = Math.min(1 + 0.05 * state.streak, 2.0);
@@ -758,8 +747,9 @@ function render() {
       const sc = fs / 14;
       ctx.font = `${fs}px ui-monospace, monospace`;
       const word = e.word;
-      const typed = word.slice(0, e.typedLen);
-      const rest  = word.slice(e.typedLen);
+      const n = typedLenFor(e);
+      const typed = word.slice(0, n);
+      const rest  = word.slice(n);
       const wY = e.y - e.def.size / 2 - 8;
       // Background pill
       const padding = 6, w = ctx.measureText(word).width;
