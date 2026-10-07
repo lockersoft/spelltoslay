@@ -880,6 +880,11 @@ function tick(now) {
     updateEnemies(dt);
     updateEffects(dt);
   }
+  // Surface the game-over modal the frame the run ends.
+  if (state.gameOver && !gameOverShown) {
+    state.running = false;
+    showGameOver();
+  }
   render();
   requestAnimationFrame(tick);
 }
@@ -892,6 +897,7 @@ const submitScoreBtn = document.getElementById('submit-score');
 const submitErrorEl  = document.getElementById('submit-error');
 const leaderboardEl  = document.getElementById('leaderboard');
 const playAgainBtn   = document.getElementById('play-again');
+const skipSubmitBtn  = document.getElementById('skip-submit');
 const rankSummaryEl  = document.getElementById('rank-summary');
 const lbTodayEl      = document.getElementById('lb-today');
 const lbAlltimeEl    = document.getElementById('lb-alltime');
@@ -904,11 +910,16 @@ function showGameOver() {
     `Score ${state.score} · ${state.kills} words · WPM ${currentWpm()} · ACC ${currentAccuracy()}% · time ${elapsedHHMMSS()}`;
   goNameEl.textContent = state.playerName;
   submitErrorEl.classList.add('hidden');
+  submitScoreBtn.disabled = false;
+  skipSubmitBtn.disabled = false;
   gameOverEl.classList.remove('hidden');
 }
 
 submitScoreBtn.addEventListener('click', async () => {
+  // Both buttons are off while the request is in flight: a restart now would
+  // let this callback put the leaderboard on top of the new game.
   submitScoreBtn.disabled = true;
+  skipSubmitBtn.disabled = true;
   submitErrorEl.classList.add('hidden');
   try {
     const r = await fetch('/api/score.php', {
@@ -929,6 +940,7 @@ submitScoreBtn.addEventListener('click', async () => {
       submitErrorEl.textContent = j.error || `HTTP ${r.status}`;
       submitErrorEl.classList.remove('hidden');
       submitScoreBtn.disabled = false;
+      skipSubmitBtn.disabled = false;
       return;
     }
     rankSummaryEl.textContent = `You ranked #${j.rank}.`;
@@ -939,6 +951,7 @@ submitScoreBtn.addEventListener('click', async () => {
     submitErrorEl.textContent = 'Could not reach server.';
     submitErrorEl.classList.remove('hidden');
     submitScoreBtn.disabled = false;
+    skipSubmitBtn.disabled = false;
   }
 });
 
@@ -952,8 +965,7 @@ async function renderLeaderboard() {
   } catch (_) { /* ignore */ }
 }
 
-playAgainBtn.addEventListener('click', () => {
-  // Reset everything
+function resetRun() {
   state.enemies.length = 0;
   state.effects.length = 0;
   prefixIndex.clear();
@@ -966,20 +978,16 @@ playAgainBtn.addEventListener('click', () => {
   state.gameOver = false;
   gameOverShown = false;
   state.typedBuffer = '';
+  state.lockedEnemyId = null;
   typeInput.value = '';
+  typeInput.classList.remove('stalled');
+  gameOverEl.classList.add('hidden');
   leaderboardEl.classList.add('hidden');
   state.running = true;
   typeInput.focus();
-});
-
-// Hook game-over into the main loop: when state.gameOver flips, surface the modal.
-const _origTick = tick;
-window._gameOverHook = setInterval(() => {
-  if (state.gameOver && !gameOverShown) {
-    state.running = false;
-    showGameOver();
-  }
-}, 50);
+}
+playAgainBtn.addEventListener('click', resetRun);
+skipSubmitBtn.addEventListener('click', resetRun);
 
 // ─── Init & start ────────────────────────────────────
 (async function init() {
