@@ -27,7 +27,8 @@ php scripts/init_db.php && php -S localhost:8001 -t public
 ```
 
 Open <http://localhost:8001>. The teacher panel is at
-<http://localhost:8001/teacher.html?key=dev>.
+<http://localhost:8001/teacher.html#key=dev> (the key is read from the
+address, kept for the tab, and removed from the address bar).
 
 Run the test suite:
 
@@ -46,7 +47,7 @@ Stop any dev server on port 8001 first.
 - PHP API: `health.php`, `score.php`, `leaderboard.php`, `state.php`,
   `teacher.php`, `players.php`, `rename.php`, `poll-vote.php`,
   `contributors.php`, `words.php`. SQLite via PDO.
-- Teacher panel at `/teacher.html?key=<KEY>` with: pause everyone,
+- Teacher panel at `/teacher.html#key=<KEY>` with: pause everyone,
   per-student pause, broadcast message, per-student message, force
   reload, clear leaderboard, live roster (name, activity dot, WPM,
   accuracy, current word, streak), live polls, contributor tracker,
@@ -145,7 +146,7 @@ Subsequent deploys use `dep deploy` or a direct SSH `git pull`.
    - Open `https://spelltoslay.lockersoft.games/` — name entry, type a
      word, see score.
    - Open
-     `https://spelltoslay.lockersoft.games/teacher.html?key=<your-key>`
+     `https://spelltoslay.lockersoft.games/teacher.html#key=<your-key>`
      — paste a 3-word list, hit "Use this list", play, see your words
      on enemies.
 
