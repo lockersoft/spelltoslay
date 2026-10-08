@@ -231,6 +231,11 @@ button { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; f
   border: 1px solid #cbd5e1;
   border-radius: 4px;
 }
+.launch-notice {
+  margin: 16px 0 0; padding: 8px 12px; border-radius: 6px;
+  background: #12261a; border: 1px solid #2ea043; color: var(--ink);
+}
+.launch-notice.warn { background: #2a2112; border-color: #d29922; }
 .active-source {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;

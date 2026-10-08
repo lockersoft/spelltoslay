@@ -137,6 +137,55 @@ function sts_hub_secret(): ?string {
 }
 
 /**
+ * Turn raw candidates (lines of a pasted list, entries of a hub word list)
+ * into words the game can use: lower-case a-z, 1-32 letters, at most 500.
+ * Returns [words, how many candidates were left out]. Blank strings do not
+ * count as left out when $ignoreBlank is set (blank lines in a pasted list).
+ */
+function sts_clean_words(array $candidates, bool $ignoreBlank = false): array {
+    $words = [];
+    $skipped = 0;
+    foreach ($candidates as $candidate) {
+        $w = is_string($candidate) ? strtolower(trim($candidate)) : null;
+        if ($w === '' && $ignoreBlank) continue;
+        if ($w === null || !preg_match('/^[a-z]{1,32}$/', $w) || count($words) >= 500) {
+            $skipped++;
+            continue;
+        }
+        $words[] = $w;
+    }
+    return [$words, $skipped];
+}
+
+/**
+ * Replace the teacher word list and make it the active source. $extraSet is
+ * appended to the UPDATE of the state row (same transaction), for callers
+ * that need to record something alongside. Caller guarantees $words is the
+ * non-empty output of sts_clean_words().
+ */
+function sts_replace_teacher_word_list(array $words, string $extraSet = '', array $extraParams = []): void {
+    $db = sts_db();
+    $db->beginTransaction();
+    try {
+        $db->exec('DELETE FROM teacher_word_list');
+        $ins = $db->prepare('INSERT INTO teacher_word_list (word, position, set_at) VALUES (:w, :p, :t)');
+        $ts = sts_now();
+        foreach ($words as $i => $w) {
+            $ins->execute([':w' => $w, ':p' => $i, ':t' => $ts]);
+        }
+        $upd = $db->prepare(
+            "UPDATE state SET word_source='teacher', word_list_version=word_list_version+1, version=version+1"
+            . ($extraSet !== '' ? ', ' . $extraSet : '') . ' WHERE id=1'
+        );
+        $upd->execute($extraParams);
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+}
+
+/**
  * May this hub teacher control the game? The hub lets anyone register as a
  * teacher, and this game is one shared classroom, so a valid launch token is
  * not enough on its own: the teacher's hub account id must be listed in

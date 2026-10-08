@@ -138,3 +138,62 @@ test('opening with a key replaces an earlier hub session in the same tab', async
   expect(req.headers()['x-teacher-session']).toBeUndefined();
   await expect(page.locator('#launch-label')).toHaveText('');
 });
+
+test('a launch applies the class word list and says so', async ({ page, request }) => {
+  const token = launchToken({ wordlist: { id: 88, name: 'Grade 4 Unit 2', words: ['because', 'Friend', "don't", 'thought'] } });
+  try {
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
+      page.goto(`/teacher.html#session=${token}`),
+    ]);
+    await expect(page.locator('#launch-notice')).toHaveText(
+      'Word list "Grade 4 Unit 2" is now active: 3 words. 1 could not be used (letters a–z only, no spaces or punctuation).');
+    await expect(page.locator('#active-source')).toHaveText('Active: teacher list', { timeout: 6000 });
+    const served = await (await request.get('/api/words.php')).json();
+    expect(served).toMatchObject({ source: 'teacher', words: ['because', 'friend', 'thought'] });
+
+    // A student who is already playing picks the new list up on the next poll.
+    const ctx = await page.context().browser().newContext({ baseURL: 'http://localhost:8001' });
+    try {
+      const student = await ctx.newPage();
+      await student.addInitScript(() => localStorage.setItem('sts_player_name', 'Wl'));
+      await student.goto('/');
+      await student.waitForFunction(() => window.state && window.state.wordSource === 'teacher');
+      expect(await student.evaluate(() => window.state.wordPool)).toEqual(['because', 'friend', 'thought']);
+    } finally {
+      await ctx.close();
+    }
+
+    // Reloading the panel does not show the notice again or re-apply anything.
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
+      page.reload(),
+    ]);
+    await expect(page.locator('#launch-notice')).toBeHidden();
+  } finally {
+    // Put the shared test server back on the built-in list for later specs.
+    await request.post('/api/teacher.php', { data: { action: 'clearWordList' }, headers: { 'X-Teacher-Key': 'e2e-key' } });
+  }
+});
+
+test('a launch whose list has nothing usable warns and leaves the pool alone', async ({ page, request }) => {
+  const before = await (await request.get('/api/words.php')).json();
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
+    page.goto(`/teacher.html#session=${launchToken({ wordlist: { id: 1, name: 'Phrases', words: ['ice cream', "can't"] } })}`),
+  ]);
+  await expect(page.locator('#launch-notice')).toContainText('has no words this game can use');
+  await expect(page.locator('#launch-notice')).toHaveClass(/warn/);
+  const after = await (await request.get('/api/words.php')).json();
+  expect(after.source).toBe(before.source);
+  expect(after.version).toBe(before.version);
+});
+
+test('a launch with no word list shows no notice', async ({ page }) => {
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
+    page.goto(`/teacher.html#session=${launchToken({ wordlist: undefined })}`),
+  ]);
+  await expect(page.locator('#control-panel')).toBeVisible();
+  await expect(page.locator('#launch-notice')).toBeHidden();
+});

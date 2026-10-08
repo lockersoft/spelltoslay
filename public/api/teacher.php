@@ -132,32 +132,13 @@ switch ($action) {
 
     case 'setWordList': {
         $text = (string)($body['text'] ?? '');
-        $words = [];
-        foreach (preg_split('/\R/', $text) as $line) {
-            $w = strtolower(trim($line));
-            if ($w === '') continue;
-            if (!preg_match('/^[a-z]{1,32}$/', $w)) continue; // skip non-alpha lines silently
-            $words[] = $w;
-            if (count($words) >= 500) break; // hard cap
-        }
+        // One word per line; lines that are not plain a-z words are skipped silently.
+        [$words] = sts_clean_words(preg_split('/\R/', $text), ignoreBlank: true);
         if (count($words) === 0) {
             sts_json(400, ['error' => 'list contains no usable words (a-z, max 32 chars each)']);
             return;
         }
-        $db->beginTransaction();
-        try {
-            $db->exec('DELETE FROM teacher_word_list');
-            $ins = $db->prepare('INSERT INTO teacher_word_list (word, position, set_at) VALUES (:w, :p, :t)');
-            $ts = sts_now();
-            foreach ($words as $i => $w) {
-                $ins->execute([':w' => $w, ':p' => $i, ':t' => $ts]);
-            }
-            $db->exec("UPDATE state SET word_source='teacher', word_list_version=word_list_version+1, version=version+1 WHERE id=1");
-            $db->commit();
-        } catch (\Throwable $e) {
-            $db->rollBack();
-            throw $e;
-        }
+        sts_replace_teacher_word_list($words);
         break;
     }
 

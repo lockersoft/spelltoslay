@@ -116,6 +116,11 @@ if (!in_array('push_word', $existingStateColsV2, true)) {
 if (!in_array('push_word_set_at', $existingStateColsV2, true)) {
     $pdo->exec("ALTER TABLE state ADD COLUMN push_word_set_at INTEGER NOT NULL DEFAULT 0");
 }
+// Hub launch: the launch (JWT jti) whose word list was last applied, so that
+// reopening the same launch link does not overwrite the teacher's later choice.
+if (!in_array('hub_launch_jti', $existingStateColsV2, true)) {
+    $pdo->exec("ALTER TABLE state ADD COLUMN hub_launch_jti TEXT NOT NULL DEFAULT ''");
+}
 
 // ── SpellToSlay v1: teacher-uploaded word list ────────────────────────────
 $pdo->exec(<<<SQL
