@@ -44,18 +44,29 @@ if (is_array($hubList) && is_array($hubList['words'] ?? null)) {
     $listName = is_string($hubList['name'] ?? null) ? mb_substr($hubList['name'], 0, 80) : '';
     [$words, $skipped] = sts_clean_words($hubList['words']);
     try {
-        $seen = sts_db()->query('SELECT hub_launch_jti FROM state WHERE id=1')->fetch()['hub_launch_jti'] ?? '';
-        if ($seen === $payload['jti']) {
-            $wordlist = ['status' => 'already', 'name' => $listName];
-        } elseif (count($words) === 0) {
+        if (count($words) === 0) {
             $wordlist = ['status' => 'empty', 'name' => $listName, 'skipped' => $skipped];
         } else {
-            sts_replace_teacher_word_list($words, 'hub_launch_jti = :jti', [':jti' => $payload['jti']]);
-            $wordlist = ['status' => 'applied', 'name' => $listName, 'applied' => count($words), 'skipped' => $skipped];
+            // Claim this launch and replace the list in one transaction. The
+            // claim is the first write, so two requests for the same launch
+            // cannot both get past it; a launch stays claimed until its token
+            // would have expired anyway.
+            $jti = $payload['jti'];
+            $tokenExp = (int)$payload['exp'];
+            $applied = sts_replace_teacher_word_list($words, function (PDO $db) use ($jti, $tokenExp): bool {
+                $claim = $db->prepare('INSERT OR IGNORE INTO hub_launches_applied (jti, expires_at) VALUES (:jti, :exp)');
+                $claim->execute([':jti' => $jti, ':exp' => $tokenExp]);
+                if ($claim->rowCount() === 0) return false;
+                $db->prepare('DELETE FROM hub_launches_applied WHERE expires_at < :now')->execute([':now' => sts_now()]);
+                return true;
+            });
+            $wordlist = $applied
+                ? ['status' => 'applied', 'name' => $listName, 'applied' => count($words), 'skipped' => $skipped]
+                : ['status' => 'already', 'name' => $listName];
         }
     } catch (\Throwable $e) {
-        // e.g. the hub_launch_jti column is missing because init_db.php has not
-        // run since this was deployed. The teacher still gets in.
+        // e.g. the hub_launches_applied table is missing because init_db.php
+        // has not run since this was deployed. The teacher still gets in.
         error_log('session-init: word list not applied: ' . $e->getMessage());
         $wordlist = ['status' => 'error', 'name' => $listName];
     }

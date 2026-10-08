@@ -74,7 +74,7 @@ DreamHost manages all that.
   Nothing is stored server-side, so ending a launch in the hub does not end
   the ticket early; it expires with the launch token (8h). The token's
   `wordlist.words` are applied as the teacher word list once per launch
-  (`state.hub_launch_jti` remembers the last one); the roster and
+  (table `hub_launches_applied` records each one until its token expires); the roster and
   `hub_callback` are ignored for now.
 - `public/api/score.php` cross-checks score/wave/kills/duration against
   bounds mirrored from `public/js/constants.js`. Raising a

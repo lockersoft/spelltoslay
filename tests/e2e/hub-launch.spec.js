@@ -139,9 +139,22 @@ test('opening with a key replaces an earlier hub session in the same tab', async
   await expect(page.locator('#launch-label')).toHaveText('');
 });
 
-test('a launch applies the class word list and says so', async ({ page, request }) => {
+const words = async (request) => (await request.get('/api/words.php')).json();
+const useBuiltInList = async (request) => {
+  const r = await request.post('/api/teacher.php', { data: { action: 'clearWordList' }, headers: { 'X-Teacher-Key': 'e2e-key' } });
+  expect(r.ok()).toBe(true);
+};
+
+test('a launch applies the class word list and says so', async ({ page, request, browser, baseURL }) => {
   const token = launchToken({ wordlist: { id: 88, name: 'Grade 4 Unit 2', words: ['because', 'Friend', "don't", 'thought'] } });
+  // A student is already playing on the built-in list before the launch.
+  const ctx = await browser.newContext({ baseURL });
   try {
+    const student = await ctx.newPage();
+    await student.addInitScript(() => localStorage.setItem('sts_player_name', 'Wl'));
+    await student.goto('/');
+    await student.waitForFunction(() => window.state && window.state.running && window.state.wordSource.startsWith('builtin:'));
+
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
       page.goto(`/teacher.html#session=${token}`),
@@ -149,30 +162,29 @@ test('a launch applies the class word list and says so', async ({ page, request 
     await expect(page.locator('#launch-notice')).toHaveText(
       'Word list "Grade 4 Unit 2" is now active: 3 words. 1 could not be used (letters a–z only, no spaces or punctuation).');
     await expect(page.locator('#active-source')).toHaveText('Active: teacher list', { timeout: 6000 });
-    const served = await (await request.get('/api/words.php')).json();
-    expect(served).toMatchObject({ source: 'teacher', words: ['because', 'friend', 'thought'] });
+    expect(await words(request)).toMatchObject({ source: 'teacher', words: ['because', 'friend', 'thought'] });
 
-    // A student who is already playing picks the new list up on the next poll.
-    const ctx = await page.context().browser().newContext({ baseURL: 'http://localhost:8001' });
-    try {
-      const student = await ctx.newPage();
-      await student.addInitScript(() => localStorage.setItem('sts_player_name', 'Wl'));
-      await student.goto('/');
-      await student.waitForFunction(() => window.state && window.state.wordSource === 'teacher');
-      expect(await student.evaluate(() => window.state.wordPool)).toEqual(['because', 'friend', 'thought']);
-    } finally {
-      await ctx.close();
-    }
+    // The student who was already playing picks the new list up on a later poll.
+    await student.waitForFunction(() => window.state.wordSource === 'teacher', null, { timeout: 8000 });
+    expect(await student.evaluate(() => window.state.wordPool)).toEqual(['because', 'friend', 'thought']);
 
-    // Reloading the panel does not show the notice again or re-apply anything.
+    // The teacher goes back to the built-in list, then the same launch link is
+    // opened again (closed tab, second device): it logs in but changes nothing.
+    await useBuiltInList(request);
+    const before = await words(request);
+    expect(before.source).toMatch(/^builtin:/);
+    await page.goto('about:blank');
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/api/players.php') && r.status() === 200),
-      page.reload(),
+      page.waitForResponse((r) => r.url().includes('/api/session-init.php') && r.status() === 200),
+      page.goto(`/teacher.html#session=${token}`),
     ]);
+    await expect(page.locator('#control-panel')).toBeVisible();
     await expect(page.locator('#launch-notice')).toBeHidden();
+    const after = await words(request);
+    expect({ source: after.source, version: after.version }).toEqual({ source: before.source, version: before.version });
   } finally {
-    // Put the shared test server back on the built-in list for later specs.
-    await request.post('/api/teacher.php', { data: { action: 'clearWordList' }, headers: { 'X-Teacher-Key': 'e2e-key' } });
+    await ctx.close();
+    await useBuiltInList(request);   // later specs expect the built-in list
   }
 });
 

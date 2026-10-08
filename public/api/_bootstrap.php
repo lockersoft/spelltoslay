@@ -158,29 +158,30 @@ function sts_clean_words(array $candidates, bool $ignoreBlank = false): array {
 }
 
 /**
- * Replace the teacher word list and make it the active source. $extraSet is
- * appended to the UPDATE of the state row (same transaction), for callers
- * that need to record something alongside. Caller guarantees $words is the
- * non-empty output of sts_clean_words().
+ * Replace the teacher word list and make it the active source, in one
+ * transaction. $guard, if given, runs first inside that transaction; when it
+ * returns false nothing is changed and this returns false. Caller guarantees
+ * $words is the non-empty output of sts_clean_words().
  */
-function sts_replace_teacher_word_list(array $words, string $extraSet = '', array $extraParams = []): void {
+function sts_replace_teacher_word_list(array $words, ?callable $guard = null): bool {
     $db = sts_db();
     $db->beginTransaction();
     try {
+        if ($guard !== null && $guard($db) === false) {
+            $db->rollBack();
+            return false;
+        }
         $db->exec('DELETE FROM teacher_word_list');
         $ins = $db->prepare('INSERT INTO teacher_word_list (word, position, set_at) VALUES (:w, :p, :t)');
         $ts = sts_now();
         foreach ($words as $i => $w) {
             $ins->execute([':w' => $w, ':p' => $i, ':t' => $ts]);
         }
-        $upd = $db->prepare(
-            "UPDATE state SET word_source='teacher', word_list_version=word_list_version+1, version=version+1"
-            . ($extraSet !== '' ? ', ' . $extraSet : '') . ' WHERE id=1'
-        );
-        $upd->execute($extraParams);
+        $db->exec("UPDATE state SET word_source='teacher', word_list_version=word_list_version+1, version=version+1 WHERE id=1");
         $db->commit();
+        return true;
     } catch (\Throwable $e) {
-        $db->rollBack();
+        if ($db->inTransaction()) $db->rollBack();
         throw $e;
     }
 }

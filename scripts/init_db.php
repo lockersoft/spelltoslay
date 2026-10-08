@@ -116,11 +116,6 @@ if (!in_array('push_word', $existingStateColsV2, true)) {
 if (!in_array('push_word_set_at', $existingStateColsV2, true)) {
     $pdo->exec("ALTER TABLE state ADD COLUMN push_word_set_at INTEGER NOT NULL DEFAULT 0");
 }
-// Hub launch: the launch (JWT jti) whose word list was last applied, so that
-// reopening the same launch link does not overwrite the teacher's later choice.
-if (!in_array('hub_launch_jti', $existingStateColsV2, true)) {
-    $pdo->exec("ALTER TABLE state ADD COLUMN hub_launch_jti TEXT NOT NULL DEFAULT ''");
-}
 
 // ── SpellToSlay v1: teacher-uploaded word list ────────────────────────────
 $pdo->exec(<<<SQL
@@ -132,6 +127,14 @@ CREATE TABLE IF NOT EXISTS teacher_word_list (
 )
 SQL);
 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_teacher_word_list_pos ON teacher_word_list(position)');
+
+// Hub launch: every launch (JWT jti) whose word list has been applied, kept
+// until that launch token expires, so that reopening a launch link does not
+// overwrite a list the teacher has chosen since.
+$pdo->exec("CREATE TABLE IF NOT EXISTS hub_launches_applied (
+    jti        TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+)");
 
 // Feature 12 — Live polls: columns on state singleton.
 $stateCols = $pdo->query("PRAGMA table_info(state)")->fetchAll(PDO::FETCH_ASSOC);

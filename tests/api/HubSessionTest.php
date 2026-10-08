@@ -38,6 +38,7 @@ class HubSessionTest extends TestCase
     protected function tearDown(): void
     {
         unset($_SERVER['HTTP_X_TEACHER_SESSION'], $_SERVER['HTTP_X_TEACHER_KEY']);
+        $this->resetWordState();   // leave the shared test DB on the built-in list
         $GLOBALS['__STS_CONFIG']['hub_secret'] = self::SECRET;
         $GLOBALS['__STS_CONFIG']['hub_teacher_ids'] = [7];
     }
@@ -225,7 +226,19 @@ class HubSessionTest extends TestCase
     private function resetWordState(): void
     {
         sts_db()->exec('DELETE FROM teacher_word_list');
-        sts_db()->exec("UPDATE state SET word_source='builtin:6', grade_level=6, hub_launch_jti='' WHERE id=1");
+        sts_db()->exec('DELETE FROM hub_launches_applied');
+        sts_db()->exec("UPDATE state SET word_source='builtin:6', grade_level=6 WHERE id=1");
+    }
+
+    /** Everything a launch could change: source, both version counters, the list, claimed launches. */
+    private function fullWordState(): array
+    {
+        $row = sts_db()->query('SELECT word_source, word_list_version, version FROM state WHERE id=1')->fetch();
+        return [
+            $row['word_source'], (int)$row['word_list_version'], (int)$row['version'],
+            array_column(sts_db()->query('SELECT word FROM teacher_word_list ORDER BY position')->fetchAll(), 'word'),
+            array_column(sts_db()->query('SELECT jti FROM hub_launches_applied ORDER BY jti')->fetchAll(), 'jti'),
+        ];
     }
 
     private function wordState(): array
@@ -295,11 +308,11 @@ class HubSessionTest extends TestCase
     {
         $this->resetWordState();
         sts_invoke('teacher.php', 'POST', ['key' => 'test-teacher-key-xyz'], ['action' => 'setWordList', 'text' => "mine\nown"]);
-        $before = $this->wordState();
+        $before = $this->fullWordState();
         [$status, , $json] = $this->init(self::jwt(['jti' => 'wl-5']));
         $this->assertSame(200, $status);
         $this->assertSame('none', $json['wordlist']['status']);
-        $this->assertSame($before, $this->wordState());
+        $this->assertSame($before, $this->fullWordState());
     }
 
     public static function emptyWordLists(): array
@@ -316,12 +329,12 @@ class HubSessionTest extends TestCase
     public function test_a_list_with_nothing_usable_changes_nothing_but_still_logs_in(mixed $wordlist): void
     {
         $this->resetWordState();
-        $before = $this->wordState();
+        $before = $this->fullWordState();
         [$status, , $json] = $this->init(self::jwt(['jti' => 'wl-' . md5(json_encode($wordlist)), 'wordlist' => $wordlist]));
         $this->assertSame(200, $status);
         $this->assertIsString($json['session']);
         $this->assertContains($json['wordlist']['status'], ['empty', 'none']);
-        $this->assertSame($before, $this->wordState());
+        $this->assertSame($before, $this->fullWordState());
     }
 
     public function test_list_is_capped_at_500_words(): void
@@ -338,12 +351,63 @@ class HubSessionTest extends TestCase
     public function test_a_refused_launch_never_touches_the_word_list(): void
     {
         $this->resetWordState();
-        $before = $this->wordState();
+        $before = $this->fullWordState();
         $wl = ['id' => 1, 'name' => 'L', 'words' => ['cat', 'dog']];
-        $this->init(self::jwt(['jti' => 'wl-x1', 'wordlist' => $wl, 'teacher' => ['id' => 8, 'name' => 'Other']]));
-        $this->init(self::jwt(['jti' => 'wl-x2', 'wordlist' => $wl], 'another-secret-0123456789abcdef'));
-        $this->init(self::jwt(['jti' => 'wl-x3', 'wordlist' => $wl, 'exp' => time() - 1]));
-        $this->assertSame($before, $this->wordState());
+        $refused = [
+            'unlisted teacher' => self::jwt(['jti' => 'wl-x1', 'wordlist' => $wl, 'teacher' => ['id' => 8, 'name' => 'Other']]),
+            'wrong secret'     => self::jwt(['jti' => 'wl-x2', 'wordlist' => $wl], 'another-secret-0123456789abcdef'),
+            'expired'          => self::jwt(['jti' => 'wl-x3', 'wordlist' => $wl, 'exp' => time() - 1]),
+            'other game'       => self::jwt(['jti' => 'wl-x4', 'wordlist' => $wl, 'game' => 'slay']),
+            'wrong issuer'     => self::jwt(['jti' => 'wl-x5', 'wordlist' => $wl, 'iss' => 'someone']),
+        ];
+        foreach ($refused as $why => $token) {
+            [$status] = $this->init($token);
+            $this->assertSame(403, $status, $why);
+            $this->assertSame($before, $this->fullWordState(), $why);
+        }
+    }
+
+    public function test_an_older_launch_reopened_after_a_newer_one_does_not_reapply(): void
+    {
+        $this->resetWordState();
+        $a = self::jwt(['jti' => 'wl-a', 'wordlist' => ['id' => 1, 'name' => 'A', 'words' => ['apple']]]);
+        $b = self::jwt(['jti' => 'wl-b', 'wordlist' => ['id' => 2, 'name' => 'B', 'words' => ['banana']]]);
+        $this->init($a);
+        $this->init($b);
+        // The teacher then pastes their own list in the panel.
+        sts_invoke('teacher.php', 'POST', ['key' => 'test-teacher-key-xyz'], ['action' => 'setWordList', 'text' => 'cherry']);
+        $before = $this->fullWordState();
+        foreach ([$a, $b, $a] as $token) {
+            [$status, , $json] = $this->init($token);
+            $this->assertSame(200, $status);
+            $this->assertSame('already', $json['wordlist']['status']);
+            $this->assertSame($before, $this->fullWordState());
+        }
+        $this->assertSame(['cherry'], $before[3]);
+    }
+
+    public function test_claims_of_expired_launches_are_cleared_out(): void
+    {
+        $this->resetWordState();
+        sts_db()->exec("INSERT INTO hub_launches_applied (jti, expires_at) VALUES ('old-one', " . (time() - 60) . "), ('live-one', " . (time() + 600) . ")");
+        $this->init(self::jwt(['jti' => 'wl-gc', 'wordlist' => ['id' => 1, 'name' => 'L', 'words' => ['cat']]]));
+        $this->assertSame(['live-one', 'wl-gc'], $this->fullWordState()[4]);
+    }
+
+    public function test_login_survives_a_database_that_has_not_been_migrated(): void
+    {
+        $this->resetWordState();
+        sts_db()->exec('ALTER TABLE hub_launches_applied RENAME TO hub_launches_applied_hidden');
+        try {
+            $before = [$this->wordState()];
+            [$status, , $json] = $this->init(self::jwt(['jti' => 'wl-nomig', 'wordlist' => ['id' => 1, 'name' => 'L', 'words' => ['cat']]]));
+            $this->assertSame(200, $status);
+            $this->assertIsString($json['session']);
+            $this->assertSame('error', $json['wordlist']['status']);
+            $this->assertSame($before, [$this->wordState()]);   // rolled back, nothing half-applied
+        } finally {
+            sts_db()->exec('ALTER TABLE hub_launches_applied_hidden RENAME TO hub_launches_applied');
+        }
     }
 
     public function test_pasted_list_in_the_panel_still_works_after_the_refactor(): void
