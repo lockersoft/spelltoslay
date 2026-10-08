@@ -9,6 +9,7 @@ register_shutdown_function(fn() => @unlink($tmpDb));
 
 define('STS_DB_PATH', $tmpDb);
 define('STS_TEACHER_KEY', 'test-teacher-key-xyz');
+define('STS_HUB_SECRET', 'test-hub-secret-0123456789abcdef');
 
 // Initialize schema by including the init script.
 require __DIR__ . '/../scripts/init_db.php';

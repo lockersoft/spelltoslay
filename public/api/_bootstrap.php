@@ -10,7 +10,7 @@ $dbPath = defined('STS_DB_PATH')
     ? STS_DB_PATH
     : ($envDb ?: __DIR__ . '/../../data/spelltoslay.db');
 
-$config = ['teacher_key' => null];
+$config = ['teacher_key' => null, 'hub_secret' => null];
 $configFile = __DIR__ . '/../../config/config.php';
 if (defined('STS_TEACHER_KEY')) {
     $config['teacher_key'] = STS_TEACHER_KEY;
@@ -18,6 +18,13 @@ if (defined('STS_TEACHER_KEY')) {
     $config['teacher_key'] = $envKey;
 } elseif (file_exists($configFile)) {
     $config = array_merge($config, require $configFile);
+}
+// Shared secret with the lockersoft.games hub (its LSG_HUB_SECRET_SPELLTOSLAY).
+// Unset means hub launches are refused; the teacher key keeps working.
+if (defined('STS_HUB_SECRET')) {
+    $config['hub_secret'] = STS_HUB_SECRET;
+} elseif (getenv('STS_HUB_SECRET')) {
+    $config['hub_secret'] = getenv('STS_HUB_SECRET');
 }
 
 $GLOBALS['__STS_DB_PATH']   = $dbPath;
@@ -93,16 +100,105 @@ function sts_json(int $status, array|string $body): void {
 
 function sts_now(): int { return time(); }
 
+function sts_b64url_encode(string $bytes): string {
+    return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+}
+
+function sts_b64url_decode(string $text): string|false {
+    return base64_decode(strtr($text, '-_', '+/'), true);
+}
+
+/**
+ * The hub secret, or null when hub launches are not configured. A short value
+ * counts as not configured: an empty or guessable HMAC key would let anyone
+ * mint a launch token.
+ */
+function sts_hub_secret(): ?string {
+    $secret = sts_config()['hub_secret'] ?? null;
+    return (is_string($secret) && strlen($secret) >= 16) ? $secret : null;
+}
+
+/**
+ * Verify a launch token issued by the lockersoft.games hub (an HS256 JWT, see
+ * LaunchTokenIssuer in that repo). Returns the payload, or null if the token
+ * is not one we should trust. Only HS256 is accepted, whatever the token's
+ * own header claims.
+ */
+function sts_verify_hub_launch_token(string $jwt): ?array {
+    $secret = sts_hub_secret();
+    if ($secret === null || strlen($jwt) > 262144) return null;
+    $parts = explode('.', $jwt);
+    if (count($parts) !== 3) return null;
+    [$head64, $body64, $sig64] = $parts;
+
+    $headJson = sts_b64url_decode($head64);
+    $header   = $headJson === false ? null : json_decode($headJson, true);
+    if (!is_array($header) || ($header['alg'] ?? null) !== 'HS256') return null;
+
+    $sig = sts_b64url_decode($sig64);
+    if ($sig === false) return null;
+    $expected = hash_hmac('sha256', $head64 . '.' . $body64, $secret, true);
+    if (!hash_equals($expected, $sig)) return null;
+
+    $bodyJson = sts_b64url_decode($body64);
+    $payload  = $bodyJson === false ? null : json_decode($bodyJson, true);
+    if (!is_array($payload)) return null;
+    if (($payload['iss'] ?? null) !== 'hub') return null;
+    if (($payload['game'] ?? null) !== 'spelltoslay') return null;
+    if (!is_int($payload['exp'] ?? null) || $payload['exp'] <= sts_now()) return null;
+    if (!is_string($payload['jti'] ?? null) || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $payload['jti'])) return null;
+    return $payload;
+}
+
+/**
+ * A short signed ticket the teacher panel sends on every request after a hub
+ * launch. The launch token itself can be many kilobytes (it carries the class
+ * roster and word list), too big to repeat in a header every two seconds.
+ * Format: v1.<expiry unix>.<launch jti>.<signature>. Nothing is stored
+ * server-side; the signature and expiry are the whole check.
+ */
+function sts_teacher_ticket(int $exp, string $jti): string {
+    $secret = sts_hub_secret();
+    if ($secret === null) {
+        throw new \LogicException('hub secret not configured');
+    }
+    $body = "v1.$exp.$jti";
+    return $body . '.' . sts_b64url_encode(hash_hmac('sha256', 'sts-teacher-session.' . $body, $secret, true));
+}
+
+function sts_verify_teacher_ticket(string $ticket): bool {
+    $secret = sts_hub_secret();
+    if ($secret === null || strlen($ticket) > 512) return false;
+    $parts = explode('.', $ticket);
+    if (count($parts) !== 4) return false;
+    [$version, $exp, $jti, $sig64] = $parts;
+    if ($version !== 'v1' || !ctype_digit($exp) || !preg_match('/^[A-Za-z0-9\-]{1,64}$/', $jti)) return false;
+    $sig = sts_b64url_decode($sig64);
+    if ($sig === false) return false;
+    $expected = hash_hmac('sha256', "sts-teacher-session.v1.$exp.$jti", $secret, true);
+    return hash_equals($expected, $sig) && (int)$exp > sts_now();
+}
+
 /**
  * Gate for teacher-only endpoints. Emits the 403 itself; callers just return.
- * The key travels in the X-Teacher-Key header so it stays out of URLs, browser
- * history and access logs; ?key= is still honoured for curl and old bookmarks.
- * When the header is present it is the only thing checked.
+ *
+ * Two ways in:
+ *  - X-Teacher-Session: a ticket from /api/session-init.php (hub launch).
+ *  - X-Teacher-Key: the static teacher key; ?key= is still honoured for curl
+ *    and old bookmarks. Headers keep both out of URLs and access logs.
+ * Whichever credential is presented first in that order is the only one
+ * checked: a bad ticket is not rescued by a good key.
  */
 function sts_require_teacher(): bool {
-    $expected = sts_config()['teacher_key'] ?? null;
-    $provided = $_SERVER['HTTP_X_TEACHER_KEY'] ?? ($_GET['key'] ?? '');
-    if (!$expected || !is_string($provided) || !hash_equals((string)$expected, $provided)) {
+    $session = $_SERVER['HTTP_X_TEACHER_SESSION'] ?? null;
+    if ($session !== null) {
+        $ok = is_string($session) && sts_verify_teacher_ticket($session);
+    } else {
+        $expected = sts_config()['teacher_key'] ?? null;
+        $provided = $_SERVER['HTTP_X_TEACHER_KEY'] ?? ($_GET['key'] ?? '');
+        $ok = $expected && is_string($provided) && hash_equals((string)$expected, $provided);
+    }
+    if (!$ok) {
         sts_json(403, ['error' => 'forbidden']);
         return false;
     }

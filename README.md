@@ -47,7 +47,8 @@ Stop any dev server on port 8001 first.
 - PHP API: `health.php`, `score.php`, `leaderboard.php`, `state.php`,
   `teacher.php`, `players.php`, `rename.php`, `poll-vote.php`,
   `contributors.php`, `words.php`. SQLite via PDO.
-- Teacher panel at `/teacher.html#key=<KEY>` with: pause everyone,
+- Teacher panel at `/teacher.html#key=<KEY>` (or opened key-free from the
+  lockersoft.games hub, when `hub_secret` is set in `config/config.php`) with: pause everyone,
   per-student pause, broadcast message, per-student message, force
   reload, clear leaderboard, live roster (name, activity dot, WPM,
   accuracy, current word, streak), live polls, contributor tracker,

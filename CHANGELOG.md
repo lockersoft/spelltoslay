@@ -14,6 +14,7 @@
 - Teacher key is sent as an `X-Teacher-Key` header and removed from the address bar; `teacher.html#key=…` is the preferred link form (`?key=` still works).
 - POST bodies are base64url-wrapped (`{"z": …}`) so the host's request filter cannot reject free text such as a pasted spelling list.
 - Enter submits the name form.
+- Hub launch: "Open game console" from lockersoft.games (`teacher.html#session=<token>`) now opens the teacher panel with no key. The game verifies the hub's signed launch token (`POST /api/session-init.php`) and hands the panel a short session ticket (`X-Teacher-Session`). Needs `hub_secret` in `config/config.php`, equal to the hub's `LSG_HUB_SECRET_SPELLTOSLAY`; without it hub launches are refused and the teacher key works as before. Authentication only: the launch token's class roster and word list are not used yet.
 
 ### Fixed
 - Name-entry sign-in: typing your name now works. The gameplay typing input's blur-recapture (refocus 50ms after losing focus) was unconditional and stole focus from `#entry-name` mid-keystroke. Recapture now requires `state.running`, which is false while any modal is up.

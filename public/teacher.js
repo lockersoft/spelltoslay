@@ -1,25 +1,45 @@
 import { postJson } from './js/api.js';
 
-// The key arrives once in the URL (fragment preferred, ?key= for old
-// bookmarks), is kept for this tab in sessionStorage, and is then removed from
-// the address bar so it is not on screen when the panel is projected.
-function readKeyFromUrl() {
+// Two ways to open the panel, both arriving once in the URL and both removed
+// from the address bar straight away (so nothing is on screen when the panel
+// is projected):
+//  - #session=<token>  a launch from the lockersoft.games hub. The token is
+//    exchanged for a short session ticket; no key needed.
+//  - #key=<key> (or ?key= for old bookmarks)  the static teacher key.
+// What we end up holding is kept in sessionStorage for this tab only.
+function readCredentialsFromUrl() {
   const url = new URL(location.href);
-  const fromHash = new URLSearchParams(url.hash.replace(/^#/, '')).get('key');
-  const fromQuery = url.searchParams.get('key');
-  if (fromHash || fromQuery) {
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+  const launchToken = hash.get('session') || '';
+  const keyFromHash = hash.get('key');
+  const keyFromQuery = url.searchParams.get('key');
+  if (launchToken || keyFromHash || keyFromQuery) {
     url.searchParams.delete('key');
     history.replaceState(null, '', url.pathname + url.search);
   }
-  return fromHash || fromQuery || '';
+  return { launchToken, key: keyFromHash || keyFromQuery || '' };
 }
 
-function storedKey() {
-  try { return sessionStorage.getItem('sts_teacher_key') || ''; } catch (_) { return ''; }
+function stored(name) {
+  try { return sessionStorage.getItem(name) || ''; } catch (_) { return ''; }
+}
+function store(name, value) {
+  try {
+    if (value) sessionStorage.setItem(name, value);
+    else sessionStorage.removeItem(name);
+  } catch (_) { /* credential lives for this page only */ }
 }
 
-let key = readKeyFromUrl() || storedKey();
-try { if (key) sessionStorage.setItem('sts_teacher_key', key); } catch (_) { /* key lives for this page only */ }
+const fromUrl = readCredentialsFromUrl();
+let key = fromUrl.key || stored('sts_teacher_key');
+let ticket = stored('sts_teacher_session');   // hub session ticket, if any
+if (fromUrl.key) {
+  // An explicit key replaces an earlier hub session in this tab.
+  ticket = '';
+  store('sts_teacher_session', '');
+  store('sts_launch_label', '');
+}
+store('sts_teacher_key', key);
 
 const gate = document.getElementById('auth-gate');
 const panel = document.getElementById('control-panel');
@@ -27,26 +47,74 @@ const errEl = document.getElementById('teacher-error');
 const timers = [];
 
 const WRONG_KEY = 'That key was not accepted. Open this page again with the right key.';
+const SESSION_ENDED = 'Your hub session has ended. Launch SpellToSlay again from the hub.';
+const LAUNCH_REFUSED = 'That launch link was not accepted or has expired. Launch SpellToSlay again from the hub.';
+
 function showGate(message) {
   timers.splice(0).forEach(clearInterval);
   key = '';
-  try { sessionStorage.removeItem('sts_teacher_key'); } catch (_) {}
+  ticket = '';
+  store('sts_teacher_key', '');
+  store('sts_teacher_session', '');
+  store('sts_launch_label', '');
   panel.classList.add('hidden');
   gate.classList.remove('hidden');
   if (message) document.getElementById('auth-gate-message').textContent = message;
 }
 
-// All teacher-only requests go through here so the key is a header, never a URL.
+// The credential always travels as a header, never in a URL.
+function authHeaders() {
+  return ticket ? { 'X-Teacher-Session': ticket } : { 'X-Teacher-Key': key };
+}
+function rejected() {
+  showGate(ticket ? SESSION_ENDED : WRONG_KEY);
+}
+
+// All teacher-only GETs go through here.
 async function teacherFetch(path, init = {}) {
-  const r = await fetch(path, { ...init, headers: { ...(init.headers || {}), 'X-Teacher-Key': key } });
-  if (r.status === 403) showGate(WRONG_KEY);
+  const r = await fetch(path, { ...init, headers: { ...(init.headers || {}), ...authHeaders() } });
+  if (r.status === 403) rejected();
   return r;
 }
 
-if (key) {
+function showLaunchLabel() {
+  const el = document.getElementById('launch-label');
+  if (el) el.textContent = stored('sts_launch_label');
+}
+
+function openPanel() {
   gate.classList.add('hidden');
   panel.classList.remove('hidden');
+  showLaunchLabel();
   init();
+}
+
+// Trade the hub's launch token for a session ticket.
+async function startFromHubLaunch(launchToken) {
+  let r;
+  try {
+    r = await postJson('/api/session-init.php', { token: launchToken });
+  } catch (_) {
+    showGate('Could not reach the game server. Check the connection and launch again from the hub.');
+    return;
+  }
+  if (!r.ok) {
+    showGate(LAUNCH_REFUSED);
+    return;
+  }
+  const j = await r.json();
+  ticket = j.session;
+  key = '';
+  store('sts_teacher_session', ticket);
+  store('sts_teacher_key', '');
+  store('sts_launch_label', [j.class, j.teacher].filter(Boolean).join(' · '));
+  openPanel();
+}
+
+if (fromUrl.launchToken) {
+  startFromHubLaunch(fromUrl.launchToken);
+} else if (ticket || key) {
+  openPanel();
 }
 
 function showError(msg) {
@@ -56,8 +124,8 @@ function showError(msg) {
 }
 
 async function action(payload) {
-  const r = await postJson('/api/teacher.php', payload, { 'X-Teacher-Key': key });
-  if (r.status === 403) showGate(WRONG_KEY);
+  const r = await postJson('/api/teacher.php', payload, authHeaders());
+  if (r.status === 403) rejected();
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
     showError(j.error || `HTTP ${r.status}`);
