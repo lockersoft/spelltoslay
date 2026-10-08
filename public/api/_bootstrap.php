@@ -10,25 +10,37 @@ $dbPath = defined('STS_DB_PATH')
     ? STS_DB_PATH
     : ($envDb ?: __DIR__ . '/../../data/spelltoslay.db');
 
-$config = ['teacher_key' => null, 'hub_secret' => null];
+// File defaults first, then each setting is overridden on its own by a PHP
+// constant (PHPUnit) or environment variable (Playwright's throwaway server).
+$config = ['teacher_key' => null, 'hub_secret' => null, 'hub_teacher_ids' => []];
 $configFile = __DIR__ . '/../../config/config.php';
+$useFile = !defined('STS_TEACHER_KEY') && !$envKey;   // tests never read the developer's file
+if ($useFile && file_exists($configFile)) {
+    $config = array_merge($config, require $configFile);
+}
 if (defined('STS_TEACHER_KEY')) {
     $config['teacher_key'] = STS_TEACHER_KEY;
 } elseif ($envKey) {
     $config['teacher_key'] = $envKey;
-} elseif (file_exists($configFile)) {
-    $config = array_merge($config, require $configFile);
 }
-// Shared secret with the lockersoft.games hub (its LSG_HUB_SECRET_SPELLTOSLAY).
-// Unset means hub launches are refused; the teacher key keeps working.
+// Shared secret with the lockersoft.games hub (its LSG_HUB_SECRET_SPELLTOSLAY),
+// and the hub teacher accounts allowed to control this game. Either one unset
+// means hub launches are refused; the teacher key keeps working.
 if (defined('STS_HUB_SECRET')) {
     $config['hub_secret'] = STS_HUB_SECRET;
 } elseif (getenv('STS_HUB_SECRET')) {
     $config['hub_secret'] = getenv('STS_HUB_SECRET');
 }
+if (defined('STS_HUB_TEACHER_IDS')) {
+    $config['hub_teacher_ids'] = STS_HUB_TEACHER_IDS;
+} elseif (getenv('STS_HUB_TEACHER_IDS')) {
+    $config['hub_teacher_ids'] = array_map('intval', explode(',', getenv('STS_HUB_TEACHER_IDS')));
+}
 
 $GLOBALS['__STS_DB_PATH']   = $dbPath;
 $GLOBALS['__STS_CONFIG']    = $config;
+
+const STS_MAX_BODY_BYTES = 524288;
 
 function sts_db(): PDO {
     static $pdo = null;
@@ -53,7 +65,13 @@ function sts_input_raw(): string {
     if (isset($GLOBALS['__STS_TEST_INPUT'])) {
         return $GLOBALS['__STS_TEST_INPUT'];
     }
-    return file_get_contents('php://input') ?: '';
+    // Bounded read: nothing this API accepts is anywhere near this size, and
+    // the endpoints that take a body include unauthenticated ones.
+    $raw = file_get_contents('php://input', false, null, 0, STS_MAX_BODY_BYTES + 1) ?: '';
+    if (strlen($raw) > STS_MAX_BODY_BYTES) {
+        sts_json(413, ['error' => 'request too large']);
+    }
+    return $raw;
 }
 
 function sts_input_json(): array {
@@ -116,6 +134,17 @@ function sts_b64url_decode(string $text): string|false {
 function sts_hub_secret(): ?string {
     $secret = sts_config()['hub_secret'] ?? null;
     return (is_string($secret) && strlen($secret) >= 16) ? $secret : null;
+}
+
+/**
+ * May this hub teacher control the game? The hub lets anyone register as a
+ * teacher, and this game is one shared classroom, so a valid launch token is
+ * not enough on its own: the teacher's hub account id must be listed in
+ * `hub_teacher_ids`. An empty list allows nobody.
+ */
+function sts_hub_teacher_allowed(mixed $teacherId): bool {
+    $allowed = sts_config()['hub_teacher_ids'] ?? [];
+    return is_int($teacherId) && is_array($allowed) && in_array($teacherId, $allowed, true);
 }
 
 /**

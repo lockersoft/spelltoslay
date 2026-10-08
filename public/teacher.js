@@ -99,7 +99,10 @@ async function startFromHubLaunch(launchToken) {
     return;
   }
   if (!r.ok) {
-    showGate(LAUNCH_REFUSED);
+    const refusal = await r.json().catch(() => ({}));
+    showGate(refusal.error === 'hub account not allowed'
+      ? `Your hub account (teacher #${Number(refusal.teacherId) || '?'}) is not on this game's allow list. Ask the game's owner to add it.`
+      : LAUNCH_REFUSED);
     return;
   }
   const j = await r.json();

@@ -88,9 +88,27 @@ test('a refused launch link does not fall back to a key saved earlier in the tab
     page.goto('/teacher.html#key=e2e-key'),
   ]);
   await page.goto('about:blank');
-  await page.goto(`/teacher.html#session=${launchToken({}, 'not-the-real-secret-000000')}`);
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/session-init.php') && r.status() === 403),
+    page.goto(`/teacher.html#session=${launchToken({}, 'not-the-real-secret-000000')}`),
+  ]);
+  await expect(page.locator('#auth-gate')).toContainText('Launch SpellToSlay again from the hub');
+  await expect(page.locator('#control-panel')).toBeHidden();
+  expect(await page.evaluate(() => [sessionStorage.getItem('sts_teacher_key'), sessionStorage.getItem('sts_teacher_session')]))
+    .toEqual([null, null]);
+  await page.reload();
   await expect(page.locator('#auth-gate')).toBeVisible();
   await expect(page.locator('#control-panel')).toBeHidden();
+});
+
+test('a genuine launch from a hub account that is not on the allow list is refused', async ({ page }) => {
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/session-init.php') && r.status() === 403),
+    page.goto(`/teacher.html#session=${launchToken({ teacher: { id: 8, name: 'Someone Else' } })}`),
+  ]);
+  await expect(page.locator('#auth-gate')).toContainText("teacher #8) is not on this game's allow list");
+  await expect(page.locator('#control-panel')).toBeHidden();
+  expect(await page.evaluate(() => sessionStorage.getItem('sts_teacher_session'))).toBeNull();
 });
 
 test('when the session ticket stops being accepted the panel returns to the gate', async ({ page }) => {

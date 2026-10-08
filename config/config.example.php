@@ -11,4 +11,9 @@ return [
     // value as LSG_HUB_SECRET_SPELLTOSLAY in the hub's environment, at least
     // 16 characters. Leave it out and hub launches are refused.
     // 'hub_secret' => 'same-value-as-the-hub',
+
+    // Required with hub_secret. The hub lets anyone register as a teacher and
+    // this game is a single shared classroom, so list the hub user ids (the
+    // `users.id` of each teacher) allowed to control it. Empty = nobody.
+    // 'hub_teacher_ids' => [1],
 ];

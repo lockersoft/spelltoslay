@@ -19,6 +19,18 @@ if ($payload === null) {
     return;
 }
 
+// A genuine token is not enough: the hub account behind it has to be one this
+// game has been told to trust. The id is echoed back so the teacher can ask
+// for it to be added; the token's holder already knows it.
+$teacherId = $payload['teacher']['id'] ?? null;
+if (!sts_hub_teacher_allowed($teacherId)) {
+    sts_json(403, [
+        'error'     => 'hub account not allowed',
+        'teacherId' => is_int($teacherId) ? $teacherId : null,
+    ]);
+    return;
+}
+
 // The ticket ends when the launch token does, and never runs longer than 12h.
 $exp = min((int)$payload['exp'], sts_now() + 12 * 3600);
 

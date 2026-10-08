@@ -39,6 +39,7 @@ class HubSessionTest extends TestCase
     {
         unset($_SERVER['HTTP_X_TEACHER_SESSION'], $_SERVER['HTTP_X_TEACHER_KEY']);
         $GLOBALS['__STS_CONFIG']['hub_secret'] = self::SECRET;
+        $GLOBALS['__STS_CONFIG']['hub_teacher_ids'] = [7];
     }
 
     public function test_valid_launch_token_returns_a_session_ticket(): void
@@ -154,10 +155,63 @@ class HubSessionTest extends TestCase
 
     public function test_ticket_never_outlives_the_launch_token_or_twelve_hours(): void
     {
-        [, , $short] = $this->init(self::jwt(['exp' => time() + 120]));
-        $this->assertLessThanOrEqual(time() + 120, (int)explode('.', $short['session'])[1]);
-        [, , $long] = $this->init(self::jwt(['exp' => time() + 30 * 86400, 'jti' => 'long-one']));
-        $this->assertLessThanOrEqual(time() + 12 * 3600, (int)explode('.', $long['session'])[1]);
+        $t0 = time();
+        [$s1, , $short] = $this->init(self::jwt(['exp' => $t0 + 120]));
+        [$s2, , $long]  = $this->init(self::jwt(['exp' => $t0 + 30 * 86400, 'jti' => 'long-one']));
+        $this->assertSame([200, 200], [$s1, $s2]);
+
+        $shortExp = (int)explode('.', $short['session'])[1];
+        $this->assertSame($t0 + 120, $shortExp);
+        $this->assertSame($shortExp, $short['expiresAt']);
+
+        $longExp = (int)explode('.', $long['session'])[1];
+        $this->assertGreaterThanOrEqual($t0 + 12 * 3600, $longExp);
+        $this->assertLessThanOrEqual(time() + 12 * 3600, $longExp);
+        $this->assertSame($longExp, $long['expiresAt']);
+
+        // Both are real, working tickets.
+        foreach ([$short, $long] as $j) {
+            [$status] = sts_invoke('players.php', 'GET', [], null, ['X-Teacher-Session' => $j['session']]);
+            $this->assertSame(200, $status);
+        }
+    }
+
+    public function test_a_genuine_token_from_an_unlisted_hub_teacher_is_refused(): void
+    {
+        [$status, , $json] = $this->init(self::jwt(['teacher' => ['id' => 8, 'name' => 'Someone Else']]));
+        $this->assertSame(403, $status);
+        $this->assertSame('hub account not allowed', $json['error']);
+        $this->assertSame(8, $json['teacherId']);
+        $this->assertArrayNotHasKey('session', $json);
+    }
+
+    public static function unlistedTeacherShapes(): array
+    {
+        return [
+            'string id that looks listed' => [['id' => '7', 'name' => 'x']],
+            'fractional id'               => [['id' => 7.5, 'name' => 'x']],
+            'boolean id'                  => [['id' => true, 'name' => 'x']],
+            'no id'                       => [['name' => 'x']],
+            'teacher not an object'       => ['7'],
+            'no teacher'                  => [null],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unlistedTeacherShapes')]
+    public function test_teacher_id_must_be_a_listed_integer(mixed $teacher): void
+    {
+        [$status, , $json] = $this->init(self::jwt(['teacher' => $teacher]));
+        $this->assertSame(403, $status);
+        $this->assertArrayNotHasKey('session', $json);
+    }
+
+    public function test_an_empty_or_malformed_allow_list_allows_nobody(): void
+    {
+        foreach ([[], null, 'all', [true], ['7']] as $list) {
+            $GLOBALS['__STS_CONFIG']['hub_teacher_ids'] = $list;
+            [$status] = $this->init(self::jwt());
+            $this->assertSame(403, $status, var_export($list, true));
+        }
     }
 
     public function test_key_login_still_works(): void
