@@ -65,6 +65,15 @@ DreamHost manages all that.
 - The teacher key is sent as an `X-Teacher-Key` header
   (`sts_require_teacher()`); `?key=` still works server-side. The panel reads
   the key from `teacher.html#key=…` or `?key=…` and strips it from the URL.
+- Hub launches: lockersoft.games opens `teacher.html#session=<HS256 JWT>`.
+  `public/api/session-init.php` verifies it against `hub_secret` in
+  `config/config.php` (same value as the hub's `LSG_HUB_SECRET_SPELLTOSLAY`)
+  and returns a short stateless ticket, sent as `X-Teacher-Session`. The
+  launching teacher's hub user id must also be in `hub_teacher_ids`: the hub
+  has open teacher registration and this game is one shared classroom.
+  Nothing is stored server-side, so ending a launch in the hub does not end
+  the ticket early; it expires with the launch token (8h). The token's
+  roster / word list / `hub_callback` are ignored for now.
 - `public/api/score.php` cross-checks score/wave/kills/duration against
   bounds mirrored from `public/js/constants.js`. Raising a
   `pointMultiplier` above 4 or changing `WAVE_DURATION_S` needs the server

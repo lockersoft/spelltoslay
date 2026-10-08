@@ -25,7 +25,7 @@ export default defineConfig({
       url: 'http://localhost:8001/api/health.php',
       reuseExistingServer: false,
       timeout: 10_000,
-      env: { STS_DB_PATH: dbPath, STS_TEACHER_KEY: 'e2e-key' },
+      env: { STS_DB_PATH: dbPath, STS_TEACHER_KEY: 'e2e-key', STS_HUB_SECRET: 'e2e-hub-secret-0123456789', STS_HUB_TEACHER_IDS: '7' },
     },
   ],
 });
