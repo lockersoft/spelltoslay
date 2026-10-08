@@ -112,6 +112,26 @@ async function startFromHubLaunch(launchToken) {
   store('sts_teacher_key', '');
   store('sts_launch_label', [j.class, j.teacher].filter(Boolean).join(' · '));
   openPanel();
+  showWordListNotice(j.wordlist);
+}
+
+// Say what the launch did with the class's word list from the hub.
+function showWordListNotice(wl) {
+  if (!wl || wl.status === 'none' || wl.status === 'already') return;
+  const el = document.getElementById('launch-notice');
+  const name = wl.name ? `"${wl.name}"` : 'from the hub';
+  const skipped = wl.skipped ? ` ${wl.skipped} could not be used (letters a–z only, no spaces or punctuation).` : '';
+  let text;
+  if (wl.status === 'applied') {
+    text = `Word list ${name} is now active: ${wl.applied} ${wl.applied === 1 ? 'word' : 'words'}.${skipped}`;
+  } else if (wl.status === 'empty') {
+    text = `Word list ${name} has no words this game can use, so the word pool was left as it was.${skipped}`;
+  } else {
+    text = `Word list ${name} could not be applied. You can paste it below instead.`;
+  }
+  el.textContent = text;
+  el.classList.toggle('warn', wl.status !== 'applied' || !!wl.skipped);
+  el.classList.remove('hidden');
 }
 
 if (fromUrl.launchToken) {

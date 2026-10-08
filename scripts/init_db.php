@@ -128,6 +128,14 @@ CREATE TABLE IF NOT EXISTS teacher_word_list (
 SQL);
 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_teacher_word_list_pos ON teacher_word_list(position)');
 
+// Hub launch: every launch (JWT jti) whose word list has been applied, kept
+// until that launch token expires, so that reopening a launch link does not
+// overwrite a list the teacher has chosen since.
+$pdo->exec("CREATE TABLE IF NOT EXISTS hub_launches_applied (
+    jti        TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+)");
+
 // Feature 12 — Live polls: columns on state singleton.
 $stateCols = $pdo->query("PRAGMA table_info(state)")->fetchAll(PDO::FETCH_ASSOC);
 $existing_state = array_column($stateCols, 'name');
