@@ -39,6 +39,12 @@
 - A score payload that claims points with no `wordsSlain` is now rejected.
 - E2E tests run with one worker against a temporary database and no longer write `config/config.php`.
 - Leaderboard heading "Today" renamed "Last 24 hours" to match the query.
+- **New look** — the student game page and the teacher page now use the Debug
+  Derby theme: navy background, gradient top bar, rounded panels, chips, yellow
+  and blue buttons. `public/theme.css` is Debug Derby's `src/shared/theme.css`
+  copied unchanged; SpellToSlay's own rules stay in `public/style.css`. The teacher
+  page's sections are panels and its buttons no longer fall back to the
+  browser's grey default.
 
 ## [0.1.0] — 2026-05-06
 

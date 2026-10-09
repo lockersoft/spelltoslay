@@ -5,14 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SpellToSlay</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <header class="top">
+    <h1>SpellToSlay</h1>
+    <span class="spacer"></span>
+    <div class="hud" id="hud"></div>
+  </header>
+
   <main id="game-root">
-    <header class="topbar">
-      <h1>SpellToSlay</h1>
-      <div class="hud" id="hud"></div>
-    </header>
 
     <div class="stage">
       <canvas id="arena" width="960" height="600"></canvas>
@@ -27,7 +30,7 @@
         <h2 id="name-entry-title">Welcome to SpellToSlay</h2>
         <p>What's your name? (1–16 letters/numbers/spaces)</p>
         <label><input id="entry-name" maxlength="16" autocomplete="off" placeholder="Your name"></label>
-        <button id="start-playing">Start playing</button>
+        <button id="start-playing" class="go">Start playing</button>
         <button id="cancel-name" class="secondary hidden">Cancel</button>
         <p id="entry-error" class="error hidden"></p>
       </div>
@@ -36,7 +39,7 @@
         <h2>You died</h2>
         <p id="game-over-summary"></p>
         <p>Submitting as <strong id="game-over-name"></strong> · <a href="#" id="change-name">Change name</a></p>
-        <button id="submit-score">Submit score</button>
+        <button id="submit-score" class="go">Submit score</button>
         <button id="skip-submit" class="secondary">Play again without submitting</button>
         <p id="submit-error" class="error hidden"></p>
       </div>
@@ -48,7 +51,7 @@
         <ol id="lb-today"></ol>
         <h3>All time</h3>
         <ol id="lb-alltime"></ol>
-        <button id="play-again">Play again</button>
+        <button id="play-again" class="go">Play again</button>
       </div>
 
       <input id="type-input"

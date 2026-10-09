@@ -90,3 +90,20 @@ DreamHost manages all that.
 - `public/words/grade-*.json` — built-in spelling lists.
 - `CLAUDE.md` — this file.
 - `CHANGELOG.md` — see v0.1.0 for the SpellToSlay v1 release.
+
+## Styling
+
+Both pages load `public/theme.css` and then `public/style.css`. `theme.css` is
+the Debug Derby theme (`src/shared/theme.css` in the DebugDerby repo), copied
+byte for byte: do not edit it here. To pick up a newer Debug Derby theme, copy
+the file again from a commit (`git -C <DebugDerby checkout> show <commit>:src/shared/theme.css > public/theme.css`)
+and run `npx playwright test`. Everything specific to this game belongs in
+`style.css`, written in the theme's variables (`--bg`, `--panel`, `--panel-2`,
+`--line`, `--ink`, `--muted`, `--yellow`, `--pink`, `--blue`, `--green`,
+`--purple`, `--orange`). The theme styles inputs by `type`, so `style.css` carries a rule
+for bare `<input>`; that rule out-ranks a plain class selector, so a class
+that restyles an input must be written `input.name` and placed after that rule.
+
+To see a visual change before it ships:
+`SCREENS_LABEL=after npx playwright test -c playwright.screens.config.js`
+writes a picture of each main page and state to `screens/after/` (gitignored).

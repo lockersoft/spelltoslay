@@ -430,7 +430,7 @@ function renderPollTally() {
     container.appendChild(row);
   }
   const totalLine = document.createElement('p');
-  totalLine.style.cssText = 'margin:8px 0 0;font-size:12px;color:#6e7681';
+  totalLine.className = 'poll-tally-total';
   totalLine.textContent = `${total} of ${lastPlayers.length} responded`;
   container.appendChild(totalLine);
 }
@@ -444,7 +444,7 @@ async function refreshContributors() {
     ul.innerHTML = '';
     if (!data.contributors || data.contributors.length === 0) {
       const li = document.createElement('li');
-      li.style.color = '#6e7681';
+      li.className = 'muted';
       li.textContent = 'No student contributions shipped yet.';
       ul.appendChild(li);
       return;
