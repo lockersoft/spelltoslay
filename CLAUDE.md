@@ -102,8 +102,8 @@ and run `npx playwright test`. Everything specific to this game belongs in
 `--line`, `--ink`, `--muted`, `--yellow`, `--pink`, `--blue`, `--green`,
 `--purple`, `--orange`). The theme styles inputs by `type`, so `style.css` carries a rule
 for bare `<input>`; that rule out-ranks a plain class selector, so a class
-that restyles an input must be written `input.name`.
+that restyles an input must be written `input.name` and placed after that rule.
 
 To see a visual change before it ships:
 `SCREENS_LABEL=after npx playwright test -c playwright.screens.config.js`
-writes a picture of every page and state to `screens/after/` (gitignored).
+writes a picture of each main page and state to `screens/after/` (gitignored).

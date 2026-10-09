@@ -1038,11 +1038,11 @@ git status --short
 
 | Break | Edit | Test that must fail |
 |---|---|---|
-| A | In `public/teacher.html` delete the line `<link rel="stylesheet" href="/theme.css">` | 3 fail: teacher "navy body and the gradient top bar", "every section is a panel", the gate test |
+| A | In `public/teacher.html` delete the line `<link rel="stylesheet" href="/theme.css">` | 4 fail: teacher "navy body and the gradient top bar", "every section is a panel", the gate test, "every teacher button, roster rows included, has a theme background" |
 | B | In `public/style.css` delete the whole `input:not([type]) { … }` rule | 2 fail: "join modal uses the theme panel, field and primary button", "every section is a panel" |
 | C | Change `.roster-msg { flex: 1; min-width: 0; }` to `.roster-msg { flex: none; width: 900px; }` | "narrow teacher window" |
-| D | Change `header.top` height by adding the rule `header.top {{ padding: 30px 16px; }}` at the end of `style.css` | "the top bar stays one line high" |
-| E | Change the selector `input.type-input {{` to `.type-input {{` | "the typing box keeps its own big, bright style" |
+| D | Change `header.top` height by adding the rule `header.top { padding: 30px 16px; }` at the end of `style.css` | "the top bar stays one line high" |
+| E | Change the selector `input.type-input {` to `.type-input {` | "the typing box keeps its own big, bright style" |
 | F | Delete the line `.modal input { font-size: 16px; }` | "join modal uses the theme panel, field and primary button" |
 | G | Change `.roster-row input.roster-name-input` to `.roster-name-input` | "every teacher button, roster rows included, has a theme background" |
 

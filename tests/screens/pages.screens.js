@@ -9,6 +9,12 @@ const VIEW = { viewport: { width: 1280, height: 900 } };
 
 test.use(VIEW);
 
+// seedEnemies() makes enemies with no sprite, which the game draws as the text
+// "undefined" under each word. Give the seeded ones a real sprite for the picture.
+const giveSprites = (page) => page.evaluate(() => {
+  for (const e of window.state.enemies) e.def = { ...e.def, emoji: '👻', size: 28 };
+});
+
 test('student page states', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#name-entry')).toBeVisible();
@@ -22,6 +28,7 @@ test('student page states', async ({ page }) => {
     { id: 9001, x: 300, y: 220, word: 'planet' },
     { id: 9002, x: 640, y: 360, word: 'bridge' },
   ]);
+  await giveSprites(page);
   await page.locator('#type-input').type('pla');
   await shot(page, '02-student-playing');
 
@@ -39,13 +46,18 @@ test('student page states', async ({ page }) => {
   await shot(page, '05-student-leaderboard');
 });
 
-for (const [name, size] of [['13-student-chromebook-window', { width: 1366, height: 657 }], ['14-student-phone', { width: 390, height: 844 }]]) {
+// The phone is taken as a touch device, as a real one would be.
+for (const [name, context] of [
+  ['13-student-chromebook-window', { viewport: { width: 1366, height: 657 } }],
+  ['14-student-phone', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }],
+]) {
   test(`student page playing: ${name}`, async ({ browser }) => {
-    const page = await (await browser.newContext({ viewport: size })).newPage();
+    const page = await (await browser.newContext(context)).newPage();
     await page.addInitScript(() => localStorage.setItem('sts_player_name', 'Ada'));
     await page.goto('/');
     await page.waitForFunction(() => window.state && window.state.running);
     await seedEnemies(page, [{ id: 9001, x: 300, y: 220, word: 'planet' }]);
+    await giveSprites(page);
     await page.screenshot({ path: path.join('screens', LABEL, `${name}.png`) });   // the window, not the full page
     await page.context().close();
   });

@@ -118,6 +118,7 @@ input.type-input {
   border-radius: 10px;
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 18px;
+  line-height: normal;   /* not the body line height that "font: inherit" hands a bare input */
   letter-spacing: 1px;
   outline: none;
   text-align: center;
