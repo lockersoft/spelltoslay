@@ -40,3 +40,6 @@ playwright-report/
 
 # Build version — written by deploy:write_version, lives only on the server
 VERSION
+# Review screenshots (npx playwright test -c playwright.screens.config.js).
+# Anchored to the repo root: a bare "screens/" would also ignore tests/screens/.
+/screens/
