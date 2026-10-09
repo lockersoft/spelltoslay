@@ -5,16 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SpellToSlay · Teacher Control</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body class="teacher">
-  <main id="teacher-root">
-    <header class="topbar">
-      <h1>SpellToSlay · Teacher Control</h1>
-      <div class="hud"><span id="launch-label"></span><span id="player-count">● 0 players</span></div>
-    </header>
+  <header class="top">
+    <h1>SpellToSlay · Teacher Control</h1>
+    <span id="launch-label" class="sub"></span>
+    <span class="spacer"></span>
+    <span id="player-count" class="chip">● 0 players</span>
+  </header>
 
-    <section id="auth-gate" class="modal" style="position:static;transform:none;margin-top:40px">
+  <main id="teacher-root">
+    <section id="auth-gate" class="panel">
       <h2>Access required</h2>
       <p id="auth-gate-message">Launch SpellToSlay from the hub, or open this page with <code>#key=&lt;your-teacher-key&gt;</code> at the end of the address.</p>
     </section>
@@ -23,24 +26,26 @@
       <p id="launch-notice" class="launch-notice hidden" role="status"></p>
       <button id="pause-btn" class="big-button">⏸ PAUSE EVERYONE</button>
 
-      <div class="row">
-        <label style="flex:1">
-          Message shown to class:
-          <input id="msg-input" maxlength="200" placeholder="Eyes up front…">
-        </label>
-        <button id="send-msg">Send</button>
-        <button id="clear-msg" class="secondary">Clear</button>
-      </div>
-
-      <div class="row">
-        <button id="reload-all" class="secondary">🔄 Force everyone to reload</button>
-        <button id="clear-board" class="danger">🗑 Clear leaderboard</button>
-      </div>
-
-      <h3>Word pool</h3>
-      <div id="word-pool-section">
+      <section class="panel">
         <div class="row">
-          <label style="display:flex;align-items:center;gap:8px">
+          <label class="grow">
+            Message shown to class:
+            <input id="msg-input" maxlength="200" placeholder="Eyes up front…">
+          </label>
+          <button id="send-msg" class="blue">Send</button>
+          <button id="clear-msg" class="secondary">Clear</button>
+        </div>
+
+        <div class="row">
+          <button id="reload-all" class="secondary">🔄 Force everyone to reload</button>
+          <button id="clear-board" class="danger">🗑 Clear leaderboard</button>
+        </div>
+      </section>
+
+      <section class="panel" id="word-pool-section">
+        <h2>Word pool</h2>
+        <div class="row">
+          <label class="inline">
             Default grade:
             <select id="grade-select">
               <option value="0">K</option>
@@ -59,50 +64,56 @@
         <textarea id="word-list-textarea" rows="6"
                   placeholder="Paste this week's spelling words here, one per line…"></textarea>
         <div class="row">
-          <button id="use-list-btn">Use this list</button>
+          <button id="use-list-btn" class="blue">Use this list</button>
           <button id="revert-list-btn" class="secondary">Revert to built-in</button>
         </div>
         <div class="row">
-          <label style="flex:1">
+          <label class="grow">
             Spell this now:
             <input id="push-word-input" maxlength="32" placeholder="single word">
           </label>
-          <button id="push-word-btn">Push</button>
+          <button id="push-word-btn" class="blue">Push</button>
         </div>
-      </div>
+      </section>
 
-      <h3>Players online (<span id="roster-count">0</span>)</h3>
-      <div id="roster" class="roster"></div>
+      <section class="panel">
+        <h2>Players online (<span id="roster-count">0</span>)</h2>
+        <div id="roster" class="roster"></div>
+      </section>
 
-      <h3>Live top-5</h3>
-      <ol id="live-top"></ol>
+      <section class="panel">
+        <h2>Live top-5</h2>
+        <ol id="live-top"></ol>
+      </section>
 
-      <h3>Live Poll</h3>
-      <div id="poll-section">
+      <section class="panel" id="poll-section">
+        <h2>Live Poll</h2>
         <div id="poll-form">
           <div class="row">
-            <label style="flex:1">
+            <label class="grow">
               Question:
               <input id="poll-question-input" maxlength="200" placeholder="Ask the class a question…">
             </label>
           </div>
-          <div class="row" style="flex-wrap:wrap;gap:6px">
+          <div class="row">
             <input class="poll-opt" maxlength="40" placeholder="Option A">
             <input class="poll-opt" maxlength="40" placeholder="Option B">
             <input class="poll-opt" maxlength="40" placeholder="Option C">
             <input class="poll-opt" maxlength="40" placeholder="Option D">
           </div>
-          <button id="start-poll-btn">▶ Start poll</button>
+          <button id="start-poll-btn" class="blue">▶ Start poll</button>
         </div>
         <div id="poll-active" class="hidden">
-          <p id="poll-active-question" style="font-weight:700;margin:0 0 8px"></p>
+          <p id="poll-active-question"></p>
           <div id="poll-tally"></div>
-          <button id="end-poll-btn" class="secondary" style="margin-top:8px">■ End poll</button>
+          <button id="end-poll-btn" class="secondary">■ End poll</button>
         </div>
-      </div>
+      </section>
 
-      <h3>Contributors</h3>
-      <ul id="contributors-list" class="contributors-list"></ul>
+      <section class="panel">
+        <h2>Contributors</h2>
+        <ul id="contributors-list" class="contributors-list"></ul>
+      </section>
 
       <p id="teacher-error" class="error hidden"></p>
     </section>

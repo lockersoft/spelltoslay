@@ -51,11 +51,10 @@ export function updatePollOverlay(s) {
     ));
     const thanks = document.createElement('p');
     thanks.textContent = `✓ You picked: ${options[myAnswer] || myAnswer}`;
-    thanks.style.fontWeight = '700';
-    thanks.style.margin = '0';
+    thanks.className = 'poll-picked';
     const fade = document.createElement('p');
     fade.textContent = remaining > 0 ? `(closing in ${remaining}s)` : '';
-    fade.style.cssText = 'margin: 4px 0 0; font-size: 12px; color: #6e7681;';
+    fade.className = 'poll-closing';
     btnsEl.replaceChildren(thanks, fade);
     btnsEl.dataset.renderKey = '';
     return;
